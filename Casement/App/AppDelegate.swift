@@ -104,6 +104,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
         let menu = NSMenu()
+        let searchItem = NSMenuItem(title: "Search Windows (⌥Space)", action: #selector(toggleSearch), keyEquivalent: "")
+        menu.addItem(searchItem)
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "About Casement", action: #selector(showAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit Casement", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -112,5 +115,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showAbout() {
         NSApp.orderFrontStandardAboutPanel(nil)
+    }
+
+    @objc private func toggleSearch() {
+        searchPanelViewModel.togglePanel()
     }
 }

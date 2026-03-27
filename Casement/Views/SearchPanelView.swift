@@ -7,7 +7,17 @@ struct SearchPanelView: View {
         VStack(spacing: 0) {
             searchField
             Divider()
-            resultsList
+            if viewModel.results.isEmpty && !viewModel.query.isEmpty {
+                VStack {
+                    Spacer()
+                    Text("No matching windows")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 14))
+                    Spacer()
+                }
+            } else {
+                resultsList
+            }
         }
         .frame(width: 600, height: 400)
         .background(.ultraThinMaterial)
