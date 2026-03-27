@@ -48,7 +48,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupHotkey() {
         hotkeyManager.register(shortcut: preferencesStore.preferences.hotkeyShortcut) { [weak self] in
-            self?.searchPanelViewModel.togglePanel()
+            guard let self else { return }
+            guard self.permissionManager.state == .granted else { return }
+            self.searchPanelViewModel.togglePanel()
         }
         preferencesStore.$preferences
             .map(\.hotkeyShortcut)
@@ -151,6 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func toggleSearch() {
+        guard permissionManager.state == .granted else { return }
         searchPanelViewModel.togglePanel()
     }
 }
