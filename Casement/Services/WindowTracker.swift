@@ -55,6 +55,11 @@ final class WindowTracker: ObservableObject {
 
         enrichWithAccessibility(&updated, appsByPid: appsByPid)
 
+        // Only keep windows confirmed as real windows by AX enrichment
+        updated = updated.filter { _, record in
+            isRealWindow(record)
+        }
+
         windows = updated
         snapshotVersion += 1
     }
@@ -150,6 +155,8 @@ final class WindowTracker: ObservableObject {
             )
             guard result == .success, let windowArray = axWindows as? [AXUIElement] else { continue }
 
+            var matchedKeys: Set<WindowStableID> = []
+
             for axWindow in windowArray {
                 let axTitle = axAttribute(axWindow, kAXTitleAttribute) as? String ?? ""
                 let axRole = axAttribute(axWindow, kAXRoleAttribute) as? String
@@ -158,12 +165,16 @@ final class WindowTracker: ObservableObject {
                 let isFocused = axAttribute(axWindow, kAXFocusedAttribute) as? Bool ?? false
                 let isFullscreen = axAttribute(axWindow, "AXFullScreen") as? Bool ?? false
 
-                let fingerprint = WindowStableID.titleFingerprint(from: axTitle)
-                let matchKey = records.keys.first { key in
-                    key.pid == pid && key.titleFingerprint == fingerprint
-                }
+                let matchKey = findMatchingKey(
+                    for: axWindow,
+                    axTitle: axTitle,
+                    pid: pid,
+                    in: records,
+                    excluding: matchedKeys
+                )
 
                 if let key = matchKey, var record = records[key] {
+                    matchedKeys.insert(key)
                     if !axTitle.isEmpty {
                         record.title = axTitle
                     }
@@ -183,6 +194,59 @@ final class WindowTracker: ObservableObject {
         }
     }
 
+    private func findMatchingKey(
+        for axWindow: AXUIElement,
+        axTitle: String,
+        pid: pid_t,
+        in records: [WindowStableID: WindowRecord],
+        excluding matched: Set<WindowStableID>
+    ) -> WindowStableID? {
+        let pidKeys = records.keys.filter { $0.pid == pid && !matched.contains($0) }
+
+        // Strategy 1: Match by title fingerprint (both non-empty)
+        let titleFP = WindowStableID.titleFingerprint(from: axTitle)
+        if !titleFP.isEmpty {
+            if let key = pidKeys.first(where: { $0.titleFingerprint == titleFP }) {
+                return key
+            }
+        }
+
+        // Strategy 2: Match by bounds
+        let axBounds = axWindowBounds(axWindow)
+        if let axBounds {
+            let axBoundsFP = WindowStableID.boundsFingerprint(from: axBounds)
+            if let key = pidKeys.first(where: { $0.boundsFingerprint == axBoundsFP }) {
+                return key
+            }
+        }
+
+        // Strategy 3: Match remaining CG window with empty title to this AX window
+        if let key = pidKeys.first(where: { $0.titleFingerprint.isEmpty }) {
+            return key
+        }
+
+        return nil
+    }
+
+    private func axWindowBounds(_ element: AXUIElement) -> CGRect? {
+        var positionRef: CFTypeRef?
+        var sizeRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionRef)
+        AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeRef)
+
+        var position = CGPoint.zero
+        var size = CGSize.zero
+
+        guard let positionRef = positionRef as! AXValue?,
+              let sizeRef = sizeRef as! AXValue?
+        else { return nil }
+
+        AXValueGetValue(positionRef, .cgPoint, &position)
+        AXValueGetValue(sizeRef, .cgSize, &size)
+
+        return CGRect(origin: position, size: size)
+    }
+
     private func axAttribute(_ element: AXUIElement, _ attribute: String) -> CFTypeRef? {
         var value: CFTypeRef?
         AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
@@ -197,6 +261,18 @@ final class WindowTracker: ObservableObject {
         if record.bounds.width < 50 || record.bounds.height < 50 { return true }
         if let prefs = preferencesStore, prefs.isExcluded(record.bundleId) { return true }
         return false
+    }
+
+    private func isRealWindow(_ record: WindowRecord) -> Bool {
+        // Must have been enriched by AX (role is set)
+        guard let role = record.role else { return false }
+        // Only standard windows (not dialogs, floating panels, etc.)
+        guard role == "AXWindow" else { return false }
+        if let subrole = record.subrole,
+           subrole != "AXStandardWindow" && subrole != "AXDialog" {
+            return false
+        }
+        return true
     }
 
     // MARK: - Display resolution
