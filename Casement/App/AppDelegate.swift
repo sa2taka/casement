@@ -8,7 +8,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let permissionManager = PermissionManager()
     private let hotkeyManager = HotkeyManager()
     let windowTracker = WindowTracker()
-    let searchPanelViewModel = SearchPanelViewModel()
+    let preferencesStore = PreferencesStore()
+    let usageStore = UsageStore()
+    private(set) lazy var searchPanelViewModel = SearchPanelViewModel(
+        windowTracker: windowTracker,
+        usageStore: usageStore,
+        preferencesStore: preferencesStore
+    )
     private var panelWindow: SearchPanelWindow?
     private var cancellables = Set<AnyCancellable>()
     private var localMonitor: Any?
@@ -19,8 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if permissionManager.state != .granted {
             permissionManager.requestAccessibilityIfNeeded()
         }
-        setupHotkey()
         startTrackerIfPermitted()
+        setupHotkey()
         observePanel()
     }
 
@@ -31,8 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         permissionManager.$state
             .removeDuplicates()
             .sink { [weak self] state in
-                guard let self, state == .granted else { return }
-                self.windowTracker.start()
+                if state == .granted {
+                    self?.windowTracker.start()
+                }
             }
             .store(in: &cancellables)
     }
@@ -48,11 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .removeDuplicates()
             .sink { [weak self] visible in
                 guard let self else { return }
-                if visible {
-                    self.showPanel()
-                } else {
-                    self.hidePanel()
-                }
+                if visible { self.showPanel() } else { self.hidePanel() }
             }
             .store(in: &cancellables)
     }
@@ -75,20 +78,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             switch Int(event.keyCode) {
-            case 53: // Escape
-                self.searchPanelViewModel.closePanel()
-                return nil
-            case 125: // Down arrow
-                self.searchPanelViewModel.moveSelectionDown()
-                return nil
-            case 126: // Up arrow
-                self.searchPanelViewModel.moveSelectionUp()
-                return nil
-            case 36: // Enter
-                self.searchPanelViewModel.commitSelection()
-                return nil
-            default:
-                return event
+            case 53: self.searchPanelViewModel.closePanel(); return nil
+            case 125: self.searchPanelViewModel.moveSelectionDown(); return nil
+            case 126: self.searchPanelViewModel.moveSelectionUp(); return nil
+            case 36: self.searchPanelViewModel.commitSelection(); return nil
+            default: return event
             }
         }
     }
@@ -108,7 +102,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 accessibilityDescription: "Casement"
             )
         }
-
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "About Casement", action: #selector(showAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())

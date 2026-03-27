@@ -10,7 +10,7 @@ enum FocusError: Error {
     case focusFailed
 }
 
-final class FocusEngine {
+final class FocusEngine: Sendable {
     func focusWindow(_ record: WindowRecord) async throws {
         let app = NSRunningApplication(processIdentifier: record.pid)
         guard let app, !app.isTerminated else {
