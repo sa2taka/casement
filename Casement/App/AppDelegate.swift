@@ -1,11 +1,88 @@
 import AppKit
+import Combine
 import SwiftUI
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
+    let permissionManager = PermissionManager()
+    private let hotkeyManager = HotkeyManager()
+    let searchPanelViewModel = SearchPanelViewModel()
+    private var panelWindow: SearchPanelWindow?
+    private var cancellables = Set<AnyCancellable>()
+    private var localMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
+        permissionManager.checkAccessibility()
+        if permissionManager.state != .granted {
+            permissionManager.requestAccessibilityIfNeeded()
+        }
+        setupHotkey()
+        observePanel()
+    }
+
+    private func setupHotkey() {
+        hotkeyManager.register { [weak self] in
+            self?.searchPanelViewModel.togglePanel()
+        }
+    }
+
+    private func observePanel() {
+        searchPanelViewModel.$isVisible
+            .removeDuplicates()
+            .sink { [weak self] visible in
+                guard let self else { return }
+                if visible {
+                    self.showPanel()
+                } else {
+                    self.hidePanel()
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func showPanel() {
+        if panelWindow == nil {
+            panelWindow = SearchPanelWindow(viewModel: searchPanelViewModel)
+        }
+        panelWindow?.centerOnScreen()
+        panelWindow?.makeKeyAndOrderFront(nil)
+        installKeyMonitor()
+    }
+
+    private func hidePanel() {
+        removeKeyMonitor()
+        panelWindow?.orderOut(nil)
+    }
+
+    private func installKeyMonitor() {
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            switch Int(event.keyCode) {
+            case 53: // Escape
+                self.searchPanelViewModel.closePanel()
+                return nil
+            case 125: // Down arrow
+                self.searchPanelViewModel.moveSelectionDown()
+                return nil
+            case 126: // Up arrow
+                self.searchPanelViewModel.moveSelectionUp()
+                return nil
+            case 36: // Enter
+                self.searchPanelViewModel.commitSelection()
+                return nil
+            default:
+                return event
+            }
+        }
+    }
+
+    private func removeKeyMonitor() {
+        if let monitor = localMonitor {
+            NSEvent.removeMonitor(monitor)
+            localMonitor = nil
+        }
     }
 
     private func setupMenuBar() {
