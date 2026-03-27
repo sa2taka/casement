@@ -8,7 +8,7 @@ final class HotkeyManager {
     private nonisolated(unsafe) var hotkeyRef: EventHotKeyRef?
     private var onToggle: (() -> Void)?
 
-    func register(onToggle: @escaping () -> Void) {
+    func register(shortcut: HotkeyShortcut = .defaultShortcut, onToggle: @escaping () -> Void) {
         self.onToggle = onToggle
 
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
@@ -25,10 +25,21 @@ final class HotkeyManager {
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
         InstallEventHandler(GetApplicationEventTarget(), handler, 1, &eventType, selfPtr, &eventHandler)
 
-        // Default: Option+Space
+        registerHotkey(shortcut)
+    }
+
+    func updateHotkey(_ shortcut: HotkeyShortcut) {
+        if let ref = hotkeyRef {
+            UnregisterEventHotKey(ref)
+            hotkeyRef = nil
+        }
+        registerHotkey(shortcut)
+    }
+
+    private func registerHotkey(_ shortcut: HotkeyShortcut) {
         RegisterEventHotKey(
-            UInt32(kVK_Space),
-            UInt32(optionKey),
+            shortcut.keyCode,
+            shortcut.modifiers,
             hotkeyId,
             GetApplicationEventTarget(),
             0,

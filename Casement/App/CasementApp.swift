@@ -6,8 +6,10 @@ struct CasementApp: App {
 
     var body: some Scene {
         Settings {
-            Text("Casement Preferences")
-                .frame(width: 300, height: 200)
+            PreferencesView(
+                preferencesStore: appDelegate.preferencesStore,
+                usageStore: appDelegate.usageStore
+            )
         }
     }
 }

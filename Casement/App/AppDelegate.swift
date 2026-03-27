@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panelWindow: SearchPanelWindow?
     private var cancellables = Set<AnyCancellable>()
     private var localMonitor: Any?
+    private var globalMouseMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
@@ -46,9 +47,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupHotkey() {
-        hotkeyManager.register { [weak self] in
+        hotkeyManager.register(shortcut: preferencesStore.preferences.hotkeyShortcut) { [weak self] in
             self?.searchPanelViewModel.togglePanel()
         }
+        preferencesStore.$preferences
+            .map(\.hotkeyShortcut)
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] shortcut in
+                self?.hotkeyManager.updateHotkey(shortcut)
+            }
+            .store(in: &cancellables)
     }
 
     private func observePanel() {
@@ -68,10 +77,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panelWindow?.centerOnScreen()
         panelWindow?.makeKeyAndOrderFront(nil)
         installKeyMonitor()
+        installGlobalMouseMonitor()
     }
 
     private func hidePanel() {
         removeKeyMonitor()
+        removeGlobalMouseMonitor()
         panelWindow?.orderOut(nil)
     }
 
@@ -95,6 +106,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func installGlobalMouseMonitor() {
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, let panel = self.panelWindow else { return }
+            let screenPoint = event.locationInWindow
+            if !panel.frame.contains(screenPoint) {
+                self.searchPanelViewModel.closePanel()
+            }
+        }
+    }
+
+    private func removeGlobalMouseMonitor() {
+        if let monitor = globalMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalMouseMonitor = nil
+        }
+    }
+
     private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem?.button {
@@ -104,13 +132,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
         let menu = NSMenu()
-        let searchItem = NSMenuItem(title: "Search Windows (⌥Space)", action: #selector(toggleSearch), keyEquivalent: "")
+        let searchItem = NSMenuItem(title: "Search Windows (\(preferencesStore.preferences.hotkeyShortcut.displayString))", action: #selector(toggleSearch), keyEquivalent: "")
         menu.addItem(searchItem)
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "Preferences…", action: #selector(openPreferences), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: "About Casement", action: #selector(showAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit Casement", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem?.menu = menu
+    }
+
+    @objc private func openPreferences() {
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
     @objc private func showAbout() {
