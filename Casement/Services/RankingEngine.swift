@@ -1,13 +1,25 @@
 import Foundation
 
 final class RankingEngine {
-    func rank(candidates: [WindowRecord], context: RankingContext) -> [RankedWindow] {
-        candidates
-            .map { score($0, context: context) }
+    func rank(
+        candidates: [WindowRecord],
+        context: RankingContext,
+        shortcuts: [QuerySelectionRecord] = []
+    ) -> [RankedWindow] {
+        let shortcutMap = Dictionary(
+            shortcuts.map { ($0.targetStableIdHash, $0) },
+            uniquingKeysWith: { a, b in a.useCount >= b.useCount ? a : b }
+        )
+        return candidates
+            .map { score($0, context: context, shortcutMap: shortcutMap) }
             .sorted { $0.score > $1.score }
     }
 
-    private func score(_ window: WindowRecord, context: RankingContext) -> RankedWindow {
+    private func score(
+        _ window: WindowRecord,
+        context: RankingContext,
+        shortcutMap: [String: QuerySelectionRecord]
+    ) -> RankedWindow {
         var totalScore: Double = 0
         var reasons: [MatchReason] = []
 
@@ -30,6 +42,12 @@ final class RankingEngine {
         let (penalty, penaltyReasons) = penaltyScore(window: window)
         totalScore += penalty
         reasons.append(contentsOf: penaltyReasons)
+
+        if let shortcut = shortcutMap[window.id] {
+            let bonus = min(Double(shortcut.useCount) * 10, 50)
+            totalScore += bonus
+            reasons.append(.learnedShortcut)
+        }
 
         return RankedWindow(window: window, score: totalScore, matchReasons: reasons)
     }

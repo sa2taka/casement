@@ -95,7 +95,8 @@ final class SearchPanelViewModel: ObservableObject {
     private func updateResults() {
         let candidates = searchIndex.search(query: query)
         let context = makeRankingContext()
-        results = rankingEngine.rank(candidates: candidates, context: context)
+        let shortcuts = usageStore.records(for: TextNormalizer.normalize(query))
+        results = rankingEngine.rank(candidates: candidates, context: context, shortcuts: shortcuts)
         selectedIndex = 0
     }
 

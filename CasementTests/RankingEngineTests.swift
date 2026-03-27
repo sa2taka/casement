@@ -105,4 +105,33 @@ struct RankingEngineTests {
         let results = engine.rank(candidates: [safari], context: context(query: "Safari"))
         #expect(results.first?.matchReasons.contains(.exactAppMatch) == true)
     }
+
+    @Test("learned shortcut boosts matching window")
+    func learnedShortcutBoost() {
+        let safari = TestFixtures.windowRecord(
+            bundleId: "com.apple.Safari", appName: "Safari", title: "Apple"
+        )
+        let chrome = TestFixtures.windowRecord(
+            pid: 2345, bundleId: "com.google.Chrome", appName: "Google Chrome",
+            title: "Apple Store"
+        )
+
+        let shortcutRecords = [
+            QuerySelectionRecord(
+                query: "apple",
+                targetStableIdHash: chrome.id,
+                bundleId: chrome.bundleId,
+                useCount: 5,
+                lastUsedAt: Date()
+            )
+        ]
+
+        let results = engine.rank(
+            candidates: [safari, chrome],
+            context: context(query: "apple"),
+            shortcuts: shortcutRecords
+        )
+        #expect(results.first?.window.appName == "Google Chrome")
+        #expect(results.first?.matchReasons.contains(.learnedShortcut) == true)
+    }
 }
