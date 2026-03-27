@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     let permissionManager = PermissionManager()
     private let hotkeyManager = HotkeyManager()
+    let windowTracker = WindowTracker()
     let searchPanelViewModel = SearchPanelViewModel()
     private var panelWindow: SearchPanelWindow?
     private var cancellables = Set<AnyCancellable>()
@@ -19,7 +20,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             permissionManager.requestAccessibilityIfNeeded()
         }
         setupHotkey()
+        startTrackerIfPermitted()
         observePanel()
+    }
+
+    private func startTrackerIfPermitted() {
+        if permissionManager.state == .granted {
+            windowTracker.start()
+        }
+        permissionManager.$state
+            .removeDuplicates()
+            .sink { [weak self] state in
+                guard let self, state == .granted else { return }
+                self.windowTracker.start()
+            }
+            .store(in: &cancellables)
     }
 
     private func setupHotkey() {
