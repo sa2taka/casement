@@ -1,0 +1,42 @@
+name: Casement
+options:
+  bundleIdPrefix: com.casement
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.3"
+  createIntermediateGroups: true
+  defaultConfig: Debug
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+targets:
+  Casement:
+    type: application
+    platform: macOS
+    sources:
+      - Casement
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.casement.app
+        INFOPLIST_FILE: Casement/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Casement/Casement.entitlements
+        PRODUCT_NAME: Casement
+        ENABLE_HARDENED_RUNTIME: true
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+
+  CasementTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - CasementTests
+    dependencies:
+      - target: Casement
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.casement.tests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Casement.app/Contents/MacOS/Casement"
+        BUNDLE_LOADER: "$(TEST_HOST)"
