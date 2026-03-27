@@ -39,21 +39,17 @@ xcodegen generate
 
 This creates `Casement.xcodeproj` from `project.yml`.
 
-### 3. Build
+### 3. Build and Run
 
 ```bash
-xcodebuild -project Casement.xcodeproj -scheme Casement -configuration Debug build
+xcodebuild -project Casement.xcodeproj -scheme Casement -configuration Debug -derivedDataPath build build
 ```
-
-Or open `Casement.xcodeproj` in Xcode and press `Cmd+B`.
-
-### 4. Run
 
 ```bash
-open build/Debug/Casement.app
+open build/Build/Products/Debug/Casement.app
 ```
 
-Or press `Cmd+R` in Xcode.
+Or open `Casement.xcodeproj` in Xcode and press `Cmd+R`.
 
 On first launch, macOS will prompt you to grant Accessibility permission. Go to **System Settings > Privacy & Security > Accessibility** and enable Casement.
 

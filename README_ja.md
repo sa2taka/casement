@@ -39,21 +39,17 @@ xcodegen generate
 
 `project.yml` から `Casement.xcodeproj` が生成されます。
 
-### 3. ビルド
+### 3. ビルドと実行
 
 ```bash
-xcodebuild -project Casement.xcodeproj -scheme Casement -configuration Debug build
+xcodebuild -project Casement.xcodeproj -scheme Casement -configuration Debug -derivedDataPath build build
 ```
-
-または Xcode で `Casement.xcodeproj` を開き、`Cmd+B` でビルド。
-
-### 4. 実行
 
 ```bash
-open build/Debug/Casement.app
+open build/Build/Products/Debug/Casement.app
 ```
 
-または Xcode で `Cmd+R`。
+または Xcode で `Casement.xcodeproj` を開き、`Cmd+R` で実行。
 
 初回起動時に Accessibility 権限の許可を求められます。**システム設定 > プライバシーとセキュリティ > アクセシビリティ** で Casement を有効にしてください。
 
