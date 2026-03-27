@@ -65,13 +65,14 @@ final class SearchPanelViewModel: ObservableObject {
         }
 
         let selected = results[selectedIndex]
+        let capturedQuery = query
         closePanel()
 
         Task {
             do {
                 try await focusEngine.focusWindow(selected.window)
                 usageStore.recordSelection(
-                    query: query,
+                    query: capturedQuery,
                     targetId: selected.window.id,
                     bundleId: selected.window.bundleId
                 )

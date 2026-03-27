@@ -81,7 +81,7 @@ final class RankingEngine {
         }
 
         if reasons.isEmpty {
-            if isSubsequence(query, of: normalizedApp) || isSubsequence(query, of: normalizedTitle) {
+            if TextNormalizer.isSubsequence(query, of: normalizedApp) || TextNormalizer.isSubsequence(query, of: normalizedTitle) {
                 let ratio = Double(query.count) / Double(max(normalizedApp.count, normalizedTitle.count, 1))
                 score += 20 + ratio * 25
                 reasons.append(.subsequenceMatch)
@@ -121,13 +121,4 @@ final class RankingEngine {
         return (score, reasons)
     }
 
-    private func isSubsequence(_ query: String, of target: String) -> Bool {
-        var qi = query.startIndex
-        var ti = target.startIndex
-        while qi < query.endIndex && ti < target.endIndex {
-            if query[qi] == target[ti] { qi = query.index(after: qi) }
-            ti = target.index(after: ti)
-        }
-        return qi == query.endIndex
-    }
 }

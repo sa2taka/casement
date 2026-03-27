@@ -25,7 +25,7 @@ enum TestFixtures {
             bundleId: bundleId,
             appName: appName,
             title: title,
-            normalizedTitle: title.lowercased(),
+            normalizedTitle: TextNormalizer.normalize(title),
             bounds: CGRect(x: 0, y: 0, width: 800, height: 600),
             layer: 0,
             alpha: 1.0,

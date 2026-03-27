@@ -16,7 +16,11 @@ final class WindowTracker: ObservableObject {
         self.preferencesStore = preferencesStore
     }
 
+    private var isRunning = false
+
     func start() {
+        guard !isRunning else { return }
+        isRunning = true
         observeWorkspace()
         startPolling()
         refreshSnapshot()
@@ -59,7 +63,7 @@ final class WindowTracker: ObservableObject {
 
     private func fetchCGWindows() -> [[String: Any]] {
         guard let list = CGWindowListCopyWindowInfo(
-            [.optionOnScreenOnly, .excludeDesktopElements],
+            [.optionAll, .excludeDesktopElements],
             kCGNullWindowID
         ) as? [[String: Any]] else {
             return []

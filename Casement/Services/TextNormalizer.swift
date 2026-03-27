@@ -37,4 +37,14 @@ enum TextNormalizer {
         return normalized.components(separatedBy: .whitespaces)
             .filter { !$0.isEmpty }
     }
+
+    static func isSubsequence(_ query: String, of target: String) -> Bool {
+        var qi = query.startIndex
+        var ti = target.startIndex
+        while qi < query.endIndex && ti < target.endIndex {
+            if query[qi] == target[ti] { qi = query.index(after: qi) }
+            ti = target.index(after: ti)
+        }
+        return qi == query.endIndex
+    }
 }

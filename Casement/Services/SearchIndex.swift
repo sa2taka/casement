@@ -54,20 +54,8 @@ final class SearchIndex {
         if entry.appTokens.contains(where: { $0.hasPrefix(query) }) { return true }
         if entry.titleTokens.contains(where: { $0.hasPrefix(query) }) { return true }
         if entry.acronym.hasPrefix(query) { return true }
-        if isSubsequence(query, of: entry.normalizedAppName) { return true }
-        if isSubsequence(query, of: entry.normalizedTitle) { return true }
+        if TextNormalizer.isSubsequence(query, of: entry.normalizedAppName) { return true }
+        if TextNormalizer.isSubsequence(query, of: entry.normalizedTitle) { return true }
         return false
-    }
-
-    private func isSubsequence(_ query: String, of target: String) -> Bool {
-        var queryIndex = query.startIndex
-        var targetIndex = target.startIndex
-        while queryIndex < query.endIndex && targetIndex < target.endIndex {
-            if query[queryIndex] == target[targetIndex] {
-                queryIndex = query.index(after: queryIndex)
-            }
-            targetIndex = target.index(after: targetIndex)
-        }
-        return queryIndex == query.endIndex
     }
 }
