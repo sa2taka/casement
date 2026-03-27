@@ -10,6 +10,11 @@ final class WindowTracker: ObservableObject {
     private nonisolated(unsafe) var workspaceObservers: [NSObjectProtocol] = []
     private nonisolated(unsafe) var pollTimer: Timer?
     private let ownBundleId = Bundle.main.bundleIdentifier ?? "com.casement.app"
+    private weak var preferencesStore: PreferencesStore?
+
+    func configure(preferencesStore: PreferencesStore) {
+        self.preferencesStore = preferencesStore
+    }
 
     func start() {
         observeWorkspace()
@@ -186,6 +191,7 @@ final class WindowTracker: ObservableObject {
         if record.bundleId == ownBundleId { return true }
         if record.alpha < 0.01 { return true }
         if record.bounds.width < 50 || record.bounds.height < 50 { return true }
+        if let prefs = preferencesStore, prefs.isExcluded(record.bundleId) { return true }
         return false
     }
 

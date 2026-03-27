@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
+        windowTracker.configure(preferencesStore: preferencesStore)
         permissionManager.checkAccessibility()
         if permissionManager.state != .granted {
             permissionManager.requestAccessibilityIfNeeded()
