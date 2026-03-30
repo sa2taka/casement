@@ -88,7 +88,8 @@ final class CmuxTabProvider: TabProvider, @unchecked Sendable {
         guard tab.tabIndex < workspaces.count else { return }
 
         AXUIElementPerformAction(workspaces[tab.tabIndex], kAXPressAction as CFString)
-        AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        // AXRaise may fail on focusedWindow-obtained refs; activate() suffices
+        _ = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
         app.activate()
     }
 

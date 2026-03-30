@@ -24,14 +24,20 @@ final class ChromeTabProvider: TabProvider, @unchecked Sendable {
     }
 
     func activateTab(_ tab: TabRecord) async {
-        let script = """
-        tell application "Google Chrome"
-            set active tab index of window \(tab.windowIndex) to \(tab.tabIndex)
-            set index of window \(tab.windowIndex) to 1
-            activate
-        end tell
+        // Use JXA instead of AppleScript — more reliable with window indexing
+        let jxa = """
+        (() => {
+            const chrome = Application('Google Chrome');
+            const wins = chrome.windows();
+            if (\(tab.windowIndex - 1) < wins.length) {
+                wins[\(tab.windowIndex - 1)].activeTabIndex = \(tab.tabIndex);
+                wins[\(tab.windowIndex - 1)].index = 1;
+            }
+            chrome.activate();
+            return 'ok';
+        })();
         """
-        await runAppleScript(script)
+        await runJXAScript(jxa)
     }
 
     private func runJXA() async -> [TabRecord] {
@@ -100,13 +106,19 @@ final class ChromeTabProvider: TabProvider, @unchecked Sendable {
     }
 
     @discardableResult
-    private func runAppleScript(_ source: String) async -> Bool {
+    private func runJXAScript(_ script: String) async -> String {
         await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                var error: NSDictionary?
-                NSAppleScript(source: source)?.executeAndReturnError(&error)
-                continuation.resume(returning: error == nil)
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            process.arguments = ["-l", "JavaScript", "-e", script]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = Pipe()
+            process.terminationHandler = { _ in
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                continuation.resume(returning: String(data: data, encoding: .utf8) ?? "")
             }
+            do { try process.run() } catch { continuation.resume(returning: "") }
         }
     }
 }
