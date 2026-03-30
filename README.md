@@ -68,6 +68,16 @@ open build/Build/Products/Release/Casement.app
 
 The Release build includes compiler optimizations and is suitable for daily use.
 
+### Installing to Applications
+
+Copy the built `.app` to `/Applications` to use it like any other app:
+
+```bash
+cp -R build/Build/Products/Release/Casement.app /Applications/
+```
+
+> **Note**: Accessibility permission is tied to the app's path. After copying to `/Applications`, you may need to re-grant permission in **System Settings > Privacy & Security > Accessibility**.
+
 ### 5. Run tests
 
 ```bash
@@ -108,6 +118,7 @@ Chrome tab search requires Automation permission (macOS prompts on first use). C
 
 Open Preferences from the menu bar icon or press `Cmd+,`. You can:
 - Change the global hotkey
+- Launch at login
 - Toggle minimized / utility window inclusion
 - Manage excluded apps
 - Clear learned shortcut data
@@ -143,4 +154,4 @@ The `.xcodeproj` is generated and should not be committed to version control.
 
 ## License
 
-TBD
+MIT --- see [LICENSE](LICENSE) for details.

@@ -4,25 +4,25 @@ macOS 向けの高速キーボード駆動ウィンドウスイッチャー。
 
 Casement は、開いている全てのウィンドウをアプリ名やタイトルで検索し、数キーストロークで即座にフォーカスを切り替えます。ウィンドウ版の Spotlight です。
 
+![Casementを起動して、casementと入力している図](doc/img/casement.png)
+
 ## 機能
 
-- **グローバルホットキー** --- `Option+Space` でどこからでも検索パネルを起動
+- **グローバルホットキー** --- `Option+Space`（設定可能） でどこからでも検索パネルを起動
 - **あいまい検索** --- アプリ名、タイトル、頭文字（アクロニム）、部分一致で検索
-- **スマートランキング** --- テキスト一致度、最近使用順（MRU）、ディスプレイ/Space のコンテキスト、学習ショートカットで順位付け
-- **学習ショートカット** --- クエリとウィンドウ選択の対応を記憶し、次回以降の順位に反映
-- **ウィンドウ切替** --- アプリの activate、ウィンドウの raise、最小化解除、Space 跨ぎをリトライ付きで処理
 - **Chrome タブ検索** --- Chrome のタブをタイトルや URL ドメインで検索・切替
 - **Cmux ワークスペース検索** --- Cmux のワークスペースを検索・切替
 - **アプリ除外** --- Preferences またはインラインアクションでノイズアプリを除外
-- **メニューバー常駐** --- Dock アイコンなしでメニューバーに常駐
 
 ## 要件
 
 - macOS 14.0 (Sonoma) 以降
-- Xcode 16.3 以降 (Swift 6.3)
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 - **Accessibility 権限**（ウィンドウ列挙とフォーカス切替に必須）
 - **Automation 権限**（Chrome タブ検索用、初回使用時に macOS がダイアログ表示）
+
+現在はセルフビルドのみをサポートしています
+
+- Xcode 16.3 以降 (Swift 6.3)
 
 ## セットアップ
 
@@ -68,6 +68,16 @@ open build/Build/Products/Release/Casement.app
 
 Release ビルドはコンパイラ最適化が有効で、日常利用に適しています。
 
+### アプリケーションフォルダへのインストール
+
+ビルドした `.app` を `/Applications` にコピーすると、通常のアプリと同様に使えます:
+
+```bash
+cp -R build/Build/Products/Release/Casement.app /Applications/
+```
+
+> **注意**: Accessibility 権限はアプリのパスに紐づきます。`/Applications` へコピーした後、**システム設定 > プライバシーとセキュリティ > アクセシビリティ** で再度 Casement を許可する必要がある場合があります。
+
 ### 5. テスト実行
 
 ```bash
@@ -76,14 +86,14 @@ xcodebuild test -project Casement.xcodeproj -scheme Casement -destination 'platf
 
 ## 使い方
 
-| 操作 | キー |
-|---|---|
-| 検索パネルを開く | `Option+Space`（設定で変更可能） |
-| 検索パネルを閉じる | `Escape` |
-| 候補を移動 | `Up`/`Down` 矢印キー or `Ctrl+P`/`Ctrl+N` |
-| 選択したウィンドウへ切替 | `Enter` |
-| 選択中のウィンドウのアクションを開く | `Tab` |
-| アクションメニューを閉じる | `Escape` |
+| 操作                                 | キー                                      |
+| ------------------------------------ | ----------------------------------------- |
+| 検索パネルを開く                     | `Option+Space`（設定で変更可能）          |
+| 検索パネルを閉じる                   | `Escape`                                  |
+| 候補を移動                           | `Up`/`Down` 矢印キー or `Ctrl+P`/`Ctrl+N` |
+| 選択したウィンドウへ切替             | `Enter`                                   |
+| 選択中のウィンドウのアクションを開く | `Tab`                                     |
+| アクションメニューを閉じる           | `Escape`                                  |
 
 検索パネルが開いたら:
 1. 文字を入力してアプリ名やタイトルで絞り込む
@@ -111,25 +121,7 @@ Chrome タブ検索には Automation 権限が必要です（初回使用時に 
 - 最小化/ユーティリティウィンドウの表示切替
 - 除外アプリの管理
 - 学習ショートカットデータのクリア
-
-## アーキテクチャ
-
-```
-Casement/
-  App/            -- エントリーポイント、AppDelegate、メニューバー
-  Models/         -- WindowRecord, WindowStableID, RankingTypes
-  Services/       -- コアロジック (WindowTracker, SearchIndex, RankingEngine, FocusEngine 等)
-  ViewModels/     -- SearchPanelViewModel
-  Views/          -- SwiftUI ビュー + NSPanel ラッパー
-CasementTests/    -- ユニットテスト (36 テスト)
-project.yml       -- XcodeGen プロジェクト定義
-```
-
-主要コンポーネント:
-- **WindowTracker** --- CGWindowList + Accessibility API でウィンドウ列挙。イベント駆動 + ポーリングのハイブリッド
-- **SearchIndex** --- インメモリインデックス。prefix / contains / acronym / subsequence マッチング
-- **RankingEngine** --- 多要素スコアリング（テキスト一致、MRU 減衰、コンテキストボーナス、学習ショートカット、ペナルティ）
-- **FocusEngine** --- ウィンドウ切替ステートマシン（activate > unminimize > raise > verify）リトライ付き
+- ログイン時の自動起動設定
 
 ## 開発
 
@@ -139,8 +131,6 @@ project.yml       -- XcodeGen プロジェクト定義
 xcodegen generate
 ```
 
-`.xcodeproj` は生成ファイルのため、バージョン管理にはコミットしません。
-
 ## ライセンス
 
-未定
+MIT --- 詳細は [LICENSE](LICENSE) を参照してください。
