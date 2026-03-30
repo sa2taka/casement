@@ -18,21 +18,32 @@ final class CmuxTabProvider: TabProvider, @unchecked Sendable {
         else { return [] }
 
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
+
+        // Cmux returns empty kAXWindows when not active.
+        // Use kAXFocusedWindow as fallback, which works even when inactive.
+        var axWindows: [AXUIElement] = []
         var windowsRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef) == .success,
-              let windows = windowsRef as? [AXUIElement]
-        else { return [] }
+        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef) == .success,
+           let ws = windowsRef as? [AXUIElement], !ws.isEmpty {
+            axWindows = ws
+        } else {
+            var focusedRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedRef) == .success {
+                axWindows = [focusedRef as! AXUIElement]
+            }
+        }
+
+        guard !axWindows.isEmpty else { return [] }
 
         var tabs: [TabRecord] = []
 
-        for (wi, window) in windows.enumerated() {
+        for (wi, window) in axWindows.enumerated() {
             let workspaces = findWorkspaceElements(in: window)
             for (ti, ws) in workspaces.enumerated() {
                 var descRef: CFTypeRef?
                 AXUIElementCopyAttributeValue(ws, kAXDescriptionAttribute as CFString, &descRef)
                 guard let desc = descRef as? String else { continue }
 
-                // desc format: "name、ワークスペース N中M"
                 let name = desc.components(separatedBy: "、ワークスペース").first?
                     .trimmingCharacters(in: .whitespaces) ?? desc
 
@@ -58,13 +69,21 @@ final class CmuxTabProvider: TabProvider, @unchecked Sendable {
         else { return }
 
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        var windowsRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef) == .success,
-              let windows = windowsRef as? [AXUIElement],
-              tab.windowIndex < windows.count
-        else { return }
 
-        let window = windows[tab.windowIndex]
+        var axWindows: [AXUIElement] = []
+        var windowsRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef) == .success,
+           let ws = windowsRef as? [AXUIElement], !ws.isEmpty {
+            axWindows = ws
+        } else {
+            var focusedRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedRef) == .success {
+                axWindows = [focusedRef as! AXUIElement]
+            }
+        }
+
+        guard tab.windowIndex < axWindows.count else { return }
+        let window = axWindows[tab.windowIndex]
         let workspaces = findWorkspaceElements(in: window)
         guard tab.tabIndex < workspaces.count else { return }
 

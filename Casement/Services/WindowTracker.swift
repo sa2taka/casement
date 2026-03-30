@@ -218,10 +218,20 @@ final class WindowTracker: ObservableObject {
             if let prefs = preferencesStore, prefs.isExcluded(app.bundleIdentifier ?? "") { continue }
 
             let appElement = AXUIElementCreateApplication(pid)
+            var windowArray: [AXUIElement] = []
             var axWindows: CFTypeRef?
-            guard AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &axWindows) == .success,
-                  let windowArray = axWindows as? [AXUIElement]
-            else { continue }
+            if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &axWindows) == .success,
+               let ws = axWindows as? [AXUIElement], !ws.isEmpty {
+                windowArray = ws
+            } else {
+                // Some apps (e.g. Cmux) return empty kAXWindows when inactive.
+                // Fall back to kAXFocusedWindow.
+                var focusedRef: CFTypeRef?
+                if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedRef) == .success {
+                    windowArray = [focusedRef as! AXUIElement]
+                }
+            }
+            guard !windowArray.isEmpty else { continue }
 
             for axWindow in windowArray {
                 let title = axAttribute(axWindow, kAXTitleAttribute) as? String ?? ""
