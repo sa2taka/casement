@@ -223,8 +223,10 @@ final class SearchPanelViewModel: ObservableObject {
             if normalizedQuery.isEmpty { return true }
             let normalizedTitle = TextNormalizer.normalize(tab.title)
             let normalizedSubtitle = TextNormalizer.normalize(tab.subtitle)
+            let normalizedApp = TextNormalizer.normalize(tab.appName)
             return normalizedTitle.contains(normalizedQuery)
                 || normalizedSubtitle.contains(normalizedQuery)
+                || normalizedApp.contains(normalizedQuery)
                 || TextNormalizer.isSubsequence(normalizedQuery, of: normalizedTitle)
         }
         items.append(contentsOf: matchingTabs.map { .tab($0) })
