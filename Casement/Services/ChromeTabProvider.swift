@@ -5,7 +5,7 @@ final class ChromeTabProvider: TabProvider, @unchecked Sendable {
 
     private var cache: [TabRecord] = []
     private var cacheTime: Date = .distantPast
-    private let cacheTTL: TimeInterval = 3.0
+    private let cacheTTL: TimeInterval = 30.0
 
     func enumerateTabs() async -> [TabRecord] {
         if Date().timeIntervalSince(cacheTime) < cacheTTL {
