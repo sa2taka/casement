@@ -79,7 +79,8 @@ final class ChromeTabProvider: TabProvider, @unchecked Sendable {
                     guard let w = entry["w"] as? Int,
                           let t = entry["t"] as? Int,
                           let title = entry["title"] as? String,
-                          let url = entry["url"] as? String
+                          let url = entry["url"] as? String,
+                          !title.isEmpty
                     else { return nil }
 
                     let domain = URL(string: url)?.host ?? url
