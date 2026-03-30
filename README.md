@@ -53,6 +53,18 @@ Or open `Casement.xcodeproj` in Xcode and press `Cmd+R`.
 
 On first launch, macOS will prompt you to grant Accessibility permission. Go to **System Settings > Privacy & Security > Accessibility** and enable Casement.
 
+### 4. Release Build
+
+```bash
+xcodebuild -project Casement.xcodeproj -scheme Casement -configuration Release -derivedDataPath build build
+```
+
+```bash
+open build/Build/Products/Release/Casement.app
+```
+
+The Release build includes compiler optimizations and is suitable for daily use.
+
 ### 5. Run tests
 
 ```bash

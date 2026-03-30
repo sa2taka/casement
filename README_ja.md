@@ -53,6 +53,18 @@ open build/Build/Products/Debug/Casement.app
 
 初回起動時に Accessibility 権限の許可を求められます。**システム設定 > プライバシーとセキュリティ > アクセシビリティ** で Casement を有効にしてください。
 
+### 4. Release ビルド
+
+```bash
+xcodebuild -project Casement.xcodeproj -scheme Casement -configuration Release -derivedDataPath build build
+```
+
+```bash
+open build/Build/Products/Release/Casement.app
+```
+
+Release ビルドはコンパイラ最適化が有効で、日常利用に適しています。
+
 ### 5. テスト実行
 
 ```bash
