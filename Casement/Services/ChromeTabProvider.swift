@@ -24,20 +24,27 @@ final class ChromeTabProvider: TabProvider, @unchecked Sendable {
     }
 
     func activateTab(_ tab: TabRecord) async {
-        // Use JXA instead of AppleScript — more reliable with window indexing
+        // Switch tab via JXA, then activate Chrome via NSRunningApplication
         let jxa = """
         (() => {
             const chrome = Application('Google Chrome');
             const wins = chrome.windows();
-            if (\(tab.windowIndex - 1) < wins.length) {
-                wins[\(tab.windowIndex - 1)].activeTabIndex = \(tab.tabIndex);
-                wins[\(tab.windowIndex - 1)].index = 1;
+            const idx = \(tab.windowIndex - 1);
+            if (idx < wins.length) {
+                wins[idx].activeTabIndex = \(tab.tabIndex);
+                wins[idx].index = 1;
             }
-            chrome.activate();
             return 'ok';
         })();
         """
         await runJXAScript(jxa)
+
+        // Activate Chrome from Swift (more reliable for Space switching)
+        await MainActor.run {
+            if let chrome = NSWorkspace.shared.runningApplications.first(where: { self.supportedBundleIds.contains($0.bundleIdentifier ?? "") }) {
+                chrome.activate()
+            }
+        }
     }
 
     private func runJXA() async -> [TabRecord] {
