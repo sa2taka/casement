@@ -157,11 +157,27 @@ final class WindowTracker: ObservableObject {
             else { continue }
 
             let appElement = AXUIElementCreateApplication(pid)
+            var windowArray: [AXUIElement] = []
+
             var axWindows: CFTypeRef?
             let result = AXUIElementCopyAttributeValue(
                 appElement, kAXWindowsAttribute as CFString, &axWindows
             )
-            guard result == .success, let windowArray = axWindows as? [AXUIElement] else { continue }
+            if result == .success, let ws = axWindows as? [AXUIElement] {
+                windowArray = ws
+            }
+
+            // Some apps (e.g. VSCode, Cursor) return empty kAXWindows when inactive.
+            // Fall back to kAXFocusedWindow so at least one window gets enriched.
+            if windowArray.isEmpty {
+                var focusedRef: CFTypeRef?
+                if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedRef) == .success {
+                    // swiftlint:disable:next force_cast
+                    windowArray = [focusedRef as! AXUIElement]
+                }
+            }
+
+            guard !windowArray.isEmpty else { continue }
 
             var matchedKeys: Set<WindowStableID> = []
 
@@ -197,6 +213,37 @@ final class WindowTracker: ObservableObject {
                         record.lastActivatedAt = Date()
                     }
                     records[key] = record
+                }
+            }
+
+            // If at least one window was confirmed as AXWindow, infer the same
+            // for unmatched CG windows of the same app.
+            let hasConfirmedWindow = matchedKeys.contains { key in
+                records[key]?.role == "AXWindow"
+            }
+            if hasConfirmedWindow {
+                let allKeysForPid = records.keys.filter { $0.pid == pid }
+                let untitledKeys = allKeysForPid.filter { key in
+                    !matchedKeys.contains(key) && records[key]?.role == nil
+                }
+                for key in untitledKeys {
+                    guard var record = records[key] else { continue }
+                    record.role = "AXWindow"
+                    record.subrole = "AXStandardWindow"
+                    records[key] = record
+                }
+
+                // Fill missing titles from the app's Window menu.
+                // Electron apps (Cursor, VSCode) list all windows there even when inactive.
+                if !untitledKeys.isEmpty {
+                    let knownTitles = Set(matchedKeys.compactMap { records[$0]?.title }.filter { !$0.isEmpty })
+                    let menuTitles = windowMenuTitles(for: appElement).filter { !knownTitles.contains($0) }
+                    for (key, title) in zip(untitledKeys, menuTitles) {
+                        guard var record = records[key] else { continue }
+                        record.title = title
+                        record.normalizedTitle = TextNormalizer.normalize(title)
+                        records[key] = record
+                    }
                 }
             }
         }
@@ -336,6 +383,44 @@ final class WindowTracker: ObservableObject {
         var value: CFTypeRef?
         AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
         return value
+    }
+
+    // MARK: - Window menu title extraction
+
+    /// Read window titles from the app's "Window" menu bar item.
+    /// Electron apps (Cursor, VSCode) always list all open windows there,
+    /// even when kAXWindows returns empty.
+    private func windowMenuTitles(for appElement: AXUIElement) -> [String] {
+        guard let menuBarRef = axAttribute(appElement, kAXMenuBarAttribute),
+              let menus = axAttribute(menuBarRef as! AXUIElement, kAXChildrenAttribute) as? [AXUIElement]
+        else { return [] }
+
+        // Find the "Window" / "ウィンドウ" menu
+        for menu in menus {
+            let title = axAttribute(menu, kAXTitleAttribute) as? String ?? ""
+            guard title == "Window" || title == "ウィンドウ" || title == "ウインドウ" else { continue }
+
+            guard let subMenus = axAttribute(menu, kAXChildrenAttribute) as? [AXUIElement],
+                  let firstSub = subMenus.first,
+                  let items = axAttribute(firstSub, kAXChildrenAttribute) as? [AXUIElement]
+            else { return [] }
+
+            // Window entries are at the end of the menu, after the last separator.
+            // Walk backwards from the end, collecting non-empty titles until hitting
+            // a separator (empty title) or non-menu item.
+            var windowTitles: [String] = []
+            for item in items.reversed() {
+                let itemTitle = axAttribute(item, kAXTitleAttribute) as? String ?? ""
+                if !itemTitle.isEmpty {
+                    windowTitles.append(itemTitle)
+                } else if !windowTitles.isEmpty {
+                    break
+                }
+            }
+            windowTitles.reverse()
+            return windowTitles
+        }
+        return []
     }
 
     // MARK: - Filtering
