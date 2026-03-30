@@ -4,27 +4,27 @@ A fast, keyboard-driven window switcher for macOS.
 
 Casement lets you search all open windows by app name or title, then instantly switch focus with a few keystrokes. Think of it as Spotlight for your windows.
 
+![Launching Casement and typing "casement"](doc/img/casement.png)
+
 ## Features
 
-- **Global Hotkey** --- Press `Option+Space` from anywhere to open the search panel
+- **Global Hotkey** --- Press `Option+Space` (configurable) from anywhere to open the search panel
 - **Fuzzy Search** --- Find windows by app name, title, acronym, or subsequence
-- **Smart Ranking** --- Results are ranked by textual relevance, recency (MRU), display/space context, and learned shortcuts
-- **Learned Shortcuts** --- Casement remembers your query-to-window selections and boosts them over time
-- **Window Activation** --- Handles app activation, window raising, unminimizing, and cross-Space switching with retry
 - **Chrome Tab Search** --- Search and switch to Chrome tabs by title or URL domain
 - **Cmux Workspace Search** --- Search and switch between Cmux workspaces
 - **App Exclusion** --- Hide noisy apps from search results via Preferences or inline action
-- **Menu Bar Resident** --- Runs quietly in the menu bar with no Dock icon
 
 ## Requirements
 
 - macOS 14.0 (Sonoma) or later
-- Xcode 16.3 or later (Swift 6.3)
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 - **Accessibility permission** (required for window enumeration and focus switching)
 - **Automation permission** for Chrome tab search (macOS prompts on first use)
 
-## Getting Started
+Currently only self-build is supported:
+
+- Xcode 16.3 or later (Swift 6.3)
+
+## Setup
 
 ### 1. Install dependencies
 
@@ -108,39 +108,20 @@ The search panel opens on the display where the cursor is located.
 ### Tab Search
 
 Casement also searches **Chrome tabs** and **Cmux workspaces** alongside windows:
-- Chrome tabs are fetched via JXA and show with a "tab" badge. Selecting a tab switches Chrome to that tab and window.
-- Cmux workspaces show with a "workspace" badge. Selecting one switches to that workspace via Cmd+N shortcut.
-- Tab results appear alongside window results and are searchable by title, app name, or URL domain (Chrome).
+- Chrome tabs show with a "tab" badge. Selecting a tab switches Chrome to that tab and window.
+- Cmux workspaces show with a "workspace" badge. Selecting one switches to that workspace via Cmd+N.
+- Searchable by title, app name, or URL domain (Chrome).
 
-Chrome tab search requires Automation permission (macOS prompts on first use). Cmux workspace search uses the existing Accessibility permission.
+Chrome tab search requires Automation permission (macOS prompts on first use). Cmux uses the existing Accessibility permission.
 
 ### Preferences
 
-Open Preferences from the menu bar icon or press `Cmd+,`. You can:
+Open Preferences from the menu bar icon or press `Cmd+,`:
 - Change the global hotkey
-- Launch at login
 - Toggle minimized / utility window inclusion
 - Manage excluded apps
 - Clear learned shortcut data
-
-## Architecture
-
-```
-Casement/
-  App/            -- Entry point, AppDelegate, menu bar
-  Models/         -- WindowRecord, WindowStableID, RankingTypes
-  Services/       -- Core logic (WindowTracker, SearchIndex, RankingEngine, FocusEngine, etc.)
-  ViewModels/     -- SearchPanelViewModel
-  Views/          -- SwiftUI views + NSPanel wrapper
-CasementTests/    -- Unit tests (36 tests)
-project.yml       -- XcodeGen project spec
-```
-
-Key components:
-- **WindowTracker** --- Enumerates windows via CGWindowList + Accessibility API with event-driven + polling hybrid
-- **SearchIndex** --- In-memory index with prefix, contains, acronym, and subsequence matching
-- **RankingEngine** --- Multi-factor scoring (textual match, MRU decay, context bonuses, learned shortcuts, penalties)
-- **FocusEngine** --- Window activation state machine with retry (activate > unminimize > raise > verify)
+- Launch at login
 
 ## Development
 
@@ -149,8 +130,6 @@ After modifying `project.yml`, regenerate the Xcode project:
 ```bash
 xcodegen generate
 ```
-
-The `.xcodeproj` is generated and should not be committed to version control.
 
 ## License
 
