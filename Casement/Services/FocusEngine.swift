@@ -54,9 +54,19 @@ final class FocusEngine {
 
     private func findAXWindow(for record: WindowRecord) throws -> AXUIElement {
         let appElement = AXUIElementCreateApplication(record.pid)
+
+        // Some apps (e.g. Chrome, Cmux) return empty kAXWindows when not active.
+        // Fall back to kAXFocusedWindow.
+        var windows: [AXUIElement] = []
         var windowsRef: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef)
-        guard result == .success, let windows = windowsRef as? [AXUIElement] else {
+        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef) == .success,
+           let ws = windowsRef as? [AXUIElement], !ws.isEmpty {
+            windows = ws
+        } else {
+            var focusedRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedRef) == .success {
+                return focusedRef as! AXUIElement
+            }
             throw FocusError.axElementUnavailable
         }
 
@@ -68,6 +78,22 @@ final class FocusEngine {
             let title = titleRef as? String ?? ""
             let fingerprint = WindowStableID.titleFingerprint(from: title)
             if fingerprint == targetFingerprint {
+                return window
+            }
+        }
+
+        // Fallback: bounds matching
+        for window in windows {
+            var posRef: CFTypeRef?
+            var sizeRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &posRef)
+            AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeRef)
+            var pos = CGPoint.zero
+            var size = CGSize.zero
+            if let p = posRef as! AXValue? { AXValueGetValue(p, .cgPoint, &pos) }
+            if let s = sizeRef as! AXValue? { AXValueGetValue(s, .cgSize, &size) }
+            let bounds = CGRect(origin: pos, size: size)
+            if WindowStableID.boundsFingerprint(from: bounds) == record.stableId.boundsFingerprint {
                 return window
             }
         }

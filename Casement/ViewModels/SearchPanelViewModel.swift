@@ -18,7 +18,7 @@ enum WindowAction: String, CaseIterable, Identifiable {
 @MainActor
 final class SearchPanelViewModel: ObservableObject {
     @Published var query: String = ""
-    @Published var results: [RankedWindow] = []
+    @Published var results: [SearchResultItem] = []
     @Published var selectedIndex: Int = 0
     @Published var isVisible: Bool = false
     @Published var showingActions: Bool = false
@@ -31,16 +31,20 @@ final class SearchPanelViewModel: ObservableObject {
     private let focusEngine = FocusEngine()
     private let usageStore: UsageStore
     private let preferencesStore: PreferencesStore
+    private let tabProviders: [any TabProvider]
+    private var cachedTabs: [TabRecord] = []
     private var cancellables = Set<AnyCancellable>()
 
     init(
         windowTracker: WindowTracker,
         usageStore: UsageStore,
-        preferencesStore: PreferencesStore
+        preferencesStore: PreferencesStore,
+        tabProviders: [any TabProvider] = [ChromeTabProvider(), CmuxTabProvider()]
     ) {
         self.windowTracker = windowTracker
         self.usageStore = usageStore
         self.preferencesStore = preferencesStore
+        self.tabProviders = tabProviders
 
         $query
             .debounce(for: .milliseconds(16), scheduler: RunLoop.main)
@@ -57,10 +61,12 @@ final class SearchPanelViewModel: ObservableObject {
         selectedIndex = 0
         showingActions = false
         actionIndex = 0
+        errorMessage = nil
         isVisible = true
         windowTracker.refreshSnapshot()
         rebuildIndex()
         updateResults()
+        Task { await refreshTabs() }
     }
 
     func closePanel() {
@@ -110,8 +116,16 @@ final class SearchPanelViewModel: ObservableObject {
         let selected = results[selectedIndex]
         let capturedQuery = query
 
-        // Validate app is still running before committing
-        let app = NSRunningApplication(processIdentifier: selected.window.pid)
+        switch selected {
+        case .window(let ranked):
+            commitWindow(ranked, query: capturedQuery)
+        case .tab(let tab):
+            commitTab(tab)
+        }
+    }
+
+    private func commitWindow(_ ranked: RankedWindow, query: String) {
+        let app = NSRunningApplication(processIdentifier: ranked.window.pid)
         if app == nil || app!.isTerminated {
             windowTracker.refreshSnapshot()
             rebuildIndex()
@@ -125,17 +139,27 @@ final class SearchPanelViewModel: ObservableObject {
 
         Task {
             do {
-                try await focusEngine.focusWindow(selected.window)
+                try await focusEngine.focusWindow(ranked.window)
                 usageStore.recordSelection(
-                    query: capturedQuery,
-                    targetId: selected.window.id,
-                    bundleId: selected.window.bundleId
+                    query: query,
+                    targetId: ranked.window.id,
+                    bundleId: ranked.window.bundleId
                 )
-                usageStore.recordActivation(targetId: selected.window.id)
+                usageStore.recordActivation(targetId: ranked.window.id)
             } catch {
                 openPanel()
                 errorMessage = "Failed to switch window"
                 dismissErrorAfterDelay()
+            }
+        }
+    }
+
+    private func commitTab(_ tab: TabRecord) {
+        closePanel()
+        Task {
+            for provider in tabProviders where provider.supportedBundleIds.contains(tab.bundleId) {
+                await provider.activateTab(tab)
+                break
             }
         }
     }
@@ -150,12 +174,26 @@ final class SearchPanelViewModel: ObservableObject {
 
         switch action {
         case .excludeApp:
-            preferencesStore.addExclusion(selected.window.bundleId)
+            preferencesStore.addExclusion(selected.bundleId)
             showingActions = false
             rebuildIndex()
             updateResults()
         case .close:
             showingActions = false
+        }
+    }
+
+    private func refreshTabs() async {
+        // Run all providers in parallel; update results as each completes
+        cachedTabs = []
+        await withTaskGroup(of: [TabRecord].self) { group in
+            for provider in tabProviders {
+                group.addTask { await provider.enumerateTabs() }
+            }
+            for await tabs in group {
+                cachedTabs.append(contentsOf: tabs)
+                updateResults()
+            }
         }
     }
 
@@ -174,7 +212,26 @@ final class SearchPanelViewModel: ObservableObject {
         let candidates = searchIndex.search(query: query)
         let context = makeRankingContext()
         let shortcuts = usageStore.records(for: TextNormalizer.normalize(query))
-        results = rankingEngine.rank(candidates: candidates, context: context, shortcuts: shortcuts)
+        let rankedWindows = rankingEngine.rank(candidates: candidates, context: context, shortcuts: shortcuts)
+
+        var items: [SearchResultItem] = rankedWindows.map { .window($0) }
+
+        // Filter and score tabs
+        let normalizedQuery = TextNormalizer.normalize(query)
+        let matchingTabs = cachedTabs.filter { tab in
+            if preferencesStore.isExcluded(tab.bundleId) { return false }
+            if normalizedQuery.isEmpty { return true }
+            let normalizedTitle = TextNormalizer.normalize(tab.title)
+            let normalizedSubtitle = TextNormalizer.normalize(tab.subtitle)
+            let normalizedApp = TextNormalizer.normalize(tab.appName)
+            return normalizedTitle.contains(normalizedQuery)
+                || normalizedSubtitle.contains(normalizedQuery)
+                || normalizedApp.contains(normalizedQuery)
+                || TextNormalizer.isSubsequence(normalizedQuery, of: normalizedTitle)
+        }
+        items.append(contentsOf: matchingTabs.map { .tab($0) })
+
+        results = items
         selectedIndex = 0
     }
 

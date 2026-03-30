@@ -55,6 +55,9 @@ final class WindowTracker: ObservableObject {
 
         enrichWithAccessibility(&updated, appsByPid: appsByPid)
 
+        // Add AX-only windows (e.g. windows on other Spaces not reported by CG)
+        addAXOnlyWindows(&updated, appsByPid: appsByPid)
+
         // Only keep windows confirmed as real windows by AX enrichment
         updated = updated.filter { _, record in
             isRealWindow(record)
@@ -148,6 +151,11 @@ final class WindowTracker: ObservableObject {
         let pidGroups = Dictionary(grouping: records.values, by: \.pid)
 
         for (pid, _) in pidGroups {
+            // Skip non-GUI apps — AX queries to background services are slow/hang
+            guard let app = appsByPid[pid],
+                  app.activationPolicy == .regular
+            else { continue }
+
             let appElement = AXUIElementCreateApplication(pid)
             var axWindows: CFTypeRef?
             let result = AXUIElementCopyAttributeValue(
@@ -190,6 +198,83 @@ final class WindowTracker: ObservableObject {
                     }
                     records[key] = record
                 }
+            }
+        }
+    }
+
+    /// Add windows discovered by AX that have no corresponding CG entry
+    /// (e.g. windows on other Spaces that CGWindowList doesn't report).
+    private func addAXOnlyWindows(
+        _ records: inout [WindowStableID: WindowRecord],
+        appsByPid: [pid_t: NSRunningApplication]
+    ) {
+        let existingPids = Set(records.values.map(\.pid))
+
+        for app in appsByPid.values where app.activationPolicy == .regular {
+            let pid = app.processIdentifier
+            // Skip if we already have windows for this PID
+            if existingPids.contains(pid) { continue }
+            if app.bundleIdentifier == ownBundleId { continue }
+            if let prefs = preferencesStore, prefs.isExcluded(app.bundleIdentifier ?? "") { continue }
+
+            let appElement = AXUIElementCreateApplication(pid)
+            var windowArray: [AXUIElement] = []
+            var axWindows: CFTypeRef?
+            if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &axWindows) == .success,
+               let ws = axWindows as? [AXUIElement], !ws.isEmpty {
+                windowArray = ws
+            } else {
+                // Some apps (e.g. Cmux) return empty kAXWindows when inactive.
+                // Fall back to kAXFocusedWindow.
+                var focusedRef: CFTypeRef?
+                if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedRef) == .success {
+                    windowArray = [focusedRef as! AXUIElement]
+                }
+            }
+            guard !windowArray.isEmpty else { continue }
+
+            for axWindow in windowArray {
+                let title = axAttribute(axWindow, kAXTitleAttribute) as? String ?? ""
+                let role = axAttribute(axWindow, kAXRoleAttribute) as? String
+                let subrole = axAttribute(axWindow, kAXSubroleAttribute) as? String
+                let isMinimized = axAttribute(axWindow, kAXMinimizedAttribute) as? Bool ?? false
+                let isFocused = axAttribute(axWindow, kAXFocusedAttribute) as? Bool ?? false
+                let isFullscreen = axAttribute(axWindow, "AXFullScreen") as? Bool ?? false
+
+                let bounds = axWindowBounds(axWindow) ?? .zero
+                let stableId = WindowStableID(
+                    pid: pid,
+                    axIdentifier: nil,
+                    titleFingerprint: WindowStableID.titleFingerprint(from: title),
+                    boundsFingerprint: WindowStableID.boundsFingerprint(from: bounds)
+                )
+
+                let record = WindowRecord(
+                    stableId: stableId,
+                    cgWindowId: nil,
+                    pid: pid,
+                    bundleId: app.bundleIdentifier ?? "",
+                    appName: app.localizedName ?? "",
+                    title: title,
+                    normalizedTitle: TextNormalizer.normalize(title),
+                    bounds: bounds,
+                    layer: 0,
+                    alpha: 1.0,
+                    isOnScreen: false,
+                    isMinimized: isMinimized,
+                    isFocused: isFocused,
+                    isFullscreen: isFullscreen,
+                    isHiddenApp: app.isHidden,
+                    displayId: nil,
+                    spaceHint: nil,
+                    lastSeenAt: Date(),
+                    lastActivatedAt: windows[stableId]?.lastActivatedAt,
+                    role: role,
+                    subrole: subrole
+                )
+
+                if shouldExclude(record) { continue }
+                records[stableId] = record
             }
         }
     }
@@ -309,7 +394,7 @@ final class WindowTracker: ObservableObject {
     }
 
     private func startPolling() {
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.refreshSnapshot()
             }
