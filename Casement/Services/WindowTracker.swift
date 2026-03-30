@@ -148,6 +148,11 @@ final class WindowTracker: ObservableObject {
         let pidGroups = Dictionary(grouping: records.values, by: \.pid)
 
         for (pid, _) in pidGroups {
+            // Skip non-GUI apps — AX queries to background services are slow/hang
+            guard let app = appsByPid[pid],
+                  app.activationPolicy == .regular
+            else { continue }
+
             let appElement = AXUIElementCreateApplication(pid)
             var axWindows: CFTypeRef?
             let result = AXUIElementCopyAttributeValue(
@@ -309,7 +314,7 @@ final class WindowTracker: ObservableObject {
     }
 
     private func startPolling() {
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.refreshSnapshot()
             }

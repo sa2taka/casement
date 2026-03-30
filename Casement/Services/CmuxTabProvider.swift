@@ -73,23 +73,19 @@ final class CmuxTabProvider: TabProvider, @unchecked Sendable {
         app.activate()
     }
 
-    // Cmux workspaces are AXUnknown inside AXOpaqueProviderGroup > AXOpaqueProviderList
-    private func findWorkspaceElements(in element: AXUIElement) -> [AXUIElement] {
-        var roleRef: CFTypeRef?
-        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef)
-        let role = roleRef as? String ?? ""
+    // Cmux workspaces: AXWindow > AXGroup > AXScrollArea > AXOpaqueProviderGroup > AXOpaqueProviderList > children
+    private func findWorkspaceElements(in element: AXUIElement, depth: Int = 0) -> [AXUIElement] {
+        guard depth < 5 else { return [] }
 
         var subroleRef: CFTypeRef?
         AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subroleRef)
         let subrole = subroleRef as? String ?? ""
 
-        // The workspace list container
         if subrole == "AXOpaqueProviderList" {
             var childrenRef: CFTypeRef?
             guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
                   let children = childrenRef as? [AXUIElement]
             else { return [] }
-            // All children are workspace entries
             return children
         }
 
@@ -98,12 +94,12 @@ final class CmuxTabProvider: TabProvider, @unchecked Sendable {
               let children = childrenRef as? [AXUIElement]
         else { return [] }
 
-        // Only recurse into groups/scroll areas (avoid deep recursion into text areas)
+        // Only recurse into structural containers, not text areas or buttons
         return children.filter { child in
             var r: CFTypeRef?
             AXUIElementCopyAttributeValue(child, kAXRoleAttribute as CFString, &r)
-            let childRole = r as? String ?? ""
-            return childRole == "AXGroup" || childRole == "AXScrollArea" || childRole == "AXOpaqueProviderGroup"
-        }.flatMap { findWorkspaceElements(in: $0) }
+            let role = r as? String ?? ""
+            return role == "AXGroup" || role == "AXScrollArea" || role == "AXOpaqueProviderGroup"
+        }.flatMap { findWorkspaceElements(in: $0, depth: depth + 1) }
     }
 }
