@@ -7,6 +7,14 @@ struct SearchPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
             searchField
+            if let error = viewModel.errorMessage {
+                Text(error)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             Divider()
             if viewModel.results.isEmpty && !viewModel.query.isEmpty {
                 VStack {

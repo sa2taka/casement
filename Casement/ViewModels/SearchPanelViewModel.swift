@@ -23,6 +23,7 @@ final class SearchPanelViewModel: ObservableObject {
     @Published var isVisible: Bool = false
     @Published var showingActions: Bool = false
     @Published var actionIndex: Int = 0
+    @Published var errorMessage: String?
 
     private let windowTracker: WindowTracker
     private let searchIndex = SearchIndex()
@@ -108,6 +109,18 @@ final class SearchPanelViewModel: ObservableObject {
 
         let selected = results[selectedIndex]
         let capturedQuery = query
+
+        // Validate app is still running before committing
+        let app = NSRunningApplication(processIdentifier: selected.window.pid)
+        if app == nil || app!.isTerminated {
+            windowTracker.refreshSnapshot()
+            rebuildIndex()
+            updateResults()
+            errorMessage = "Window no longer available"
+            dismissErrorAfterDelay()
+            return
+        }
+
         closePanel()
 
         Task {
@@ -121,6 +134,8 @@ final class SearchPanelViewModel: ObservableObject {
                 usageStore.recordActivation(targetId: selected.window.id)
             } catch {
                 openPanel()
+                errorMessage = "Failed to switch window"
+                dismissErrorAfterDelay()
             }
         }
     }
@@ -149,6 +164,7 @@ final class SearchPanelViewModel: ObservableObject {
         let filtered = windowTracker.windows.values.filter { window in
             if preferencesStore.isExcluded(window.bundleId) { return false }
             if !prefs.includeMinimizedWindows && window.isMinimized { return false }
+            if !prefs.includeUtilityWindows && window.subrole == "AXDialog" { return false }
             return true
         }
         searchIndex.rebuild(from: Array(filtered))
@@ -160,6 +176,13 @@ final class SearchPanelViewModel: ObservableObject {
         let shortcuts = usageStore.records(for: TextNormalizer.normalize(query))
         results = rankingEngine.rank(candidates: candidates, context: context, shortcuts: shortcuts)
         selectedIndex = 0
+    }
+
+    private func dismissErrorAfterDelay() {
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            errorMessage = nil
+        }
     }
 
     private func makeRankingContext() -> RankingContext {
