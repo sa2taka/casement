@@ -1,12 +1,28 @@
 import AppKit
 import Combine
 
+enum WindowAction: String, CaseIterable, Identifiable {
+    case excludeApp = "Exclude this app"
+    case close = "Cancel"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .excludeApp: return "eye.slash"
+        case .close: return "xmark"
+        }
+    }
+}
+
 @MainActor
 final class SearchPanelViewModel: ObservableObject {
     @Published var query: String = ""
     @Published var results: [RankedWindow] = []
     @Published var selectedIndex: Int = 0
     @Published var isVisible: Bool = false
+    @Published var showingActions: Bool = false
+    @Published var actionIndex: Int = 0
 
     private let windowTracker: WindowTracker
     private let searchIndex = SearchIndex()
@@ -31,9 +47,15 @@ final class SearchPanelViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    var actions: [WindowAction] {
+        WindowAction.allCases
+    }
+
     func openPanel() {
         query = ""
         selectedIndex = 0
+        showingActions = false
+        actionIndex = 0
         isVisible = true
         windowTracker.refreshSnapshot()
         rebuildIndex()
@@ -48,17 +70,37 @@ final class SearchPanelViewModel: ObservableObject {
         if isVisible { closePanel() } else { openPanel() }
     }
 
+    func toggleActions() {
+        guard !results.isEmpty else { return }
+        showingActions.toggle()
+        actionIndex = 0
+    }
+
     func moveSelectionUp() {
-        guard selectedIndex > 0 else { return }
-        selectedIndex -= 1
+        if showingActions {
+            guard actionIndex > 0 else { return }
+            actionIndex -= 1
+        } else {
+            guard selectedIndex > 0 else { return }
+            selectedIndex -= 1
+        }
     }
 
     func moveSelectionDown() {
-        guard selectedIndex < results.count - 1 else { return }
-        selectedIndex += 1
+        if showingActions {
+            guard actionIndex < actions.count - 1 else { return }
+            actionIndex += 1
+        } else {
+            guard selectedIndex < results.count - 1 else { return }
+            selectedIndex += 1
+        }
     }
 
     func commitSelection() {
+        if showingActions {
+            commitAction()
+            return
+        }
         guard selectedIndex >= 0, selectedIndex < results.count else {
             closePanel()
             return
@@ -80,6 +122,25 @@ final class SearchPanelViewModel: ObservableObject {
             } catch {
                 openPanel()
             }
+        }
+    }
+
+    private func commitAction() {
+        let action = actions[actionIndex]
+        guard selectedIndex >= 0, selectedIndex < results.count else {
+            showingActions = false
+            return
+        }
+        let selected = results[selectedIndex]
+
+        switch action {
+        case .excludeApp:
+            preferencesStore.addExclusion(selected.window.bundleId)
+            showingActions = false
+            rebuildIndex()
+            updateResults()
+        case .close:
+            showingActions = false
         }
     }
 
