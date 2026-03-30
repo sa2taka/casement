@@ -54,7 +54,7 @@ final class CmuxTabProvider: TabProvider, @unchecked Sendable {
                     bundleId: "com.cmuxterm.app",
                     title: name,
                     subtitle: "workspace \(ti + 1)",
-                    windowIndex: wi,
+                    windowId: String(wi),
                     tabIndex: ti
                 ))
             }

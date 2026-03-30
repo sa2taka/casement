@@ -7,7 +7,7 @@ struct TabRecord: Sendable {
     let bundleId: String
     let title: String
     let subtitle: String
-    let windowIndex: Int
+    let windowId: String
     let tabIndex: Int
 }
 
