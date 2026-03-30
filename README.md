@@ -11,7 +11,9 @@ Casement lets you search all open windows by app name or title, then instantly s
 - **Smart Ranking** --- Results are ranked by textual relevance, recency (MRU), display/space context, and learned shortcuts
 - **Learned Shortcuts** --- Casement remembers your query-to-window selections and boosts them over time
 - **Window Activation** --- Handles app activation, window raising, unminimizing, and cross-Space switching with retry
-- **App Exclusion** --- Hide noisy apps from search results
+- **Chrome Tab Search** --- Search and switch to Chrome tabs by title or URL domain
+- **Cmux Workspace Search** --- Search and switch between Cmux workspaces
+- **App Exclusion** --- Hide noisy apps from search results via Preferences or inline action
 - **Menu Bar Resident** --- Runs quietly in the menu bar with no Dock icon
 
 ## Requirements
@@ -20,6 +22,7 @@ Casement lets you search all open windows by app name or title, then instantly s
 - Xcode 16.3 or later (Swift 6.3)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 - **Accessibility permission** (required for window enumeration and focus switching)
+- **Automation permission** for Chrome tab search (macOS prompts on first use)
 
 ## Getting Started
 
@@ -91,6 +94,15 @@ When the search panel opens:
 Empty query shows all windows ordered by most recently used.
 
 The search panel opens on the display where the cursor is located.
+
+### Tab Search
+
+Casement also searches **Chrome tabs** and **Cmux workspaces** alongside windows:
+- Chrome tabs are fetched via JXA and show with a "tab" badge. Selecting a tab switches Chrome to that tab and window.
+- Cmux workspaces show with a "workspace" badge. Selecting one switches to that workspace via Cmd+N shortcut.
+- Tab results appear alongside window results and are searchable by title, app name, or URL domain (Chrome).
+
+Chrome tab search requires Automation permission (macOS prompts on first use). Cmux workspace search uses the existing Accessibility permission.
 
 ### Preferences
 
