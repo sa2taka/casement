@@ -8,12 +8,19 @@ struct WindowRowView: View {
         HStack(spacing: 10) {
             appIcon
             VStack(alignment: .leading, spacing: 2) {
-                Text(ranked.window.title)
+                Text(ranked.window.title.isEmpty ? ranked.window.appName : ranked.window.title)
                     .font(.system(size: 14))
                     .lineLimit(1)
-                Text(ranked.window.appName)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text(ranked.window.title.isEmpty ? "" : ranked.window.appName)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    if !matchLabel.isEmpty {
+                        Text(matchLabel)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
             }
             Spacer()
             badges
@@ -35,6 +42,16 @@ struct WindowRowView: View {
             }
         }
         .frame(width: 28, height: 28)
+    }
+
+    private var matchLabel: String {
+        let positiveReasons = ranked.matchReasons.filter {
+            switch $0 {
+            case .minimizedPenalty, .hiddenAppPenalty, .utilityPenalty: return false
+            default: return true
+            }
+        }
+        return positiveReasons.map(\.description).joined(separator: " · ")
     }
 
     @ViewBuilder

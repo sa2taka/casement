@@ -18,7 +18,7 @@ struct RankedWindow: Identifiable, Sendable {
     var id: String { window.id }
 }
 
-enum MatchReason: Sendable {
+enum MatchReason: Sendable, CustomStringConvertible {
     case exactAppMatch
     case prefixAppMatch
     case containsAppMatch
@@ -34,4 +34,24 @@ enum MatchReason: Sendable {
     case minimizedPenalty
     case hiddenAppPenalty
     case utilityPenalty
+
+    var description: String {
+        switch self {
+        case .exactAppMatch: return "app"
+        case .prefixAppMatch: return "app prefix"
+        case .containsAppMatch: return "app match"
+        case .exactTitleMatch: return "title"
+        case .prefixTitleMatch: return "title prefix"
+        case .containsTitleMatch: return "title match"
+        case .acronymMatch: return "acronym"
+        case .subsequenceMatch: return "fuzzy"
+        case .recentUsage: return "recent"
+        case .sameDisplay: return "display"
+        case .sameSpace: return "space"
+        case .learnedShortcut: return "learned"
+        case .minimizedPenalty: return "minimized"
+        case .hiddenAppPenalty: return "hidden"
+        case .utilityPenalty: return "utility"
+        }
+    }
 }

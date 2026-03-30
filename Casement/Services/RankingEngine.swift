@@ -104,7 +104,9 @@ final class RankingEngine {
         if let currentDisplay = context.currentDisplayId, window.displayId == currentDisplay {
             score += 8; reasons.append(.sameDisplay)
         }
-        if let currentSpace = context.currentSpaceHint, window.spaceHint == currentSpace {
+        // Use isOnScreen as a proxy for same-Space since macOS Space detection
+        // requires private APIs. Windows on the current Space are on-screen.
+        if window.isOnScreen {
             score += 10; reasons.append(.sameSpace)
         }
         return (score, reasons)
