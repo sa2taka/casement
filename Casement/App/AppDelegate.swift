@@ -92,6 +92,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installKeyMonitor() {
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
+
+            // IME 変換中（未確定文字列がある状態）はキーイベントをテキスト入力
+            // システムに委譲する。これがないと確定の Enter が commitSelection を
+            // 発火し、矢印キーが候補選択を妨げる。
+            if let textView = self.panelWindow?.firstResponder as? NSTextView,
+               textView.hasMarkedText() {
+                return event
+            }
+
             let keyCode = Int(event.keyCode)
             let ctrl = event.modifierFlags.contains(.control)
 
