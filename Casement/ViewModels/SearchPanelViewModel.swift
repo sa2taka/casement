@@ -184,13 +184,17 @@ final class SearchPanelViewModel: ObservableObject {
     }
 
     private func refreshTabs() async {
-        var allTabs: [TabRecord] = []
-        for provider in tabProviders {
-            let tabs = await provider.enumerateTabs()
-            allTabs.append(contentsOf: tabs)
+        // Run all providers in parallel; update results as each completes
+        cachedTabs = []
+        await withTaskGroup(of: [TabRecord].self) { group in
+            for provider in tabProviders {
+                group.addTask { await provider.enumerateTabs() }
+            }
+            for await tabs in group {
+                cachedTabs.append(contentsOf: tabs)
+                updateResults()
+            }
         }
-        cachedTabs = allTabs
-        updateResults()
     }
 
     private func rebuildIndex() {
