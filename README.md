@@ -75,17 +75,30 @@ xcodebuild test -project Casement.xcodeproj -scheme Casement -destination 'platf
 
 | Action | Key |
 |---|---|
-| Open search panel | `Option+Space` |
+| Open search panel | `Option+Space` (configurable) |
 | Close search panel | `Escape` |
-| Navigate results | `Up` / `Down` arrows |
+| Navigate results | `Up`/`Down` arrows or `Ctrl+P`/`Ctrl+N` |
 | Switch to selected window | `Enter` |
+| Open actions for selected window | `Tab` |
+| Close action menu | `Escape` |
 
 When the search panel opens:
 1. Start typing to filter windows by app name or title
-2. Use arrow keys to select a result
+2. Use arrow keys (or Ctrl+N / Ctrl+P) to select a result
 3. Press Enter to switch to that window
+4. Press Tab to open actions (e.g., exclude the app from results)
 
 Empty query shows all windows ordered by most recently used.
+
+The search panel opens on the display where the cursor is located.
+
+### Preferences
+
+Open Preferences from the menu bar icon or press `Cmd+,`. You can:
+- Change the global hotkey
+- Toggle minimized / utility window inclusion
+- Manage excluded apps
+- Clear learned shortcut data
 
 ## Architecture
 
