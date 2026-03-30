@@ -106,9 +106,6 @@ struct SearchResultRowView: View {
                 if w.window.isMinimized {
                     BadgeView(text: "minimized", color: .orange)
                 }
-                if w.window.isFocused {
-                    BadgeView(text: "active", color: .green)
-                }
             }
         case .tab:
             EmptyView()
