@@ -61,9 +61,9 @@ struct SearchPanelView: View {
 
     private var resultsList: some View {
         ScrollViewReader { proxy in
-            List(Array(viewModel.results.enumerated()), id: \.element.id) { index, ranked in
-                WindowRowView(
-                    ranked: ranked,
+            List(Array(viewModel.results.enumerated()), id: \.element.id) { index, item in
+                SearchResultRowView(
+                    item: item,
                     isSelected: index == viewModel.selectedIndex && !viewModel.showingActions
                 )
                 .id(index)
@@ -91,7 +91,7 @@ struct SearchPanelView: View {
                         Text("Actions for")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
-                        Text(selected.window.appName)
+                        Text(selected.appName)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
                         Spacer()
