@@ -34,6 +34,10 @@ private struct GeneralTab: View {
                 }
             }
 
+            Section("Startup") {
+                Toggle("Launch at login", isOn: $preferencesStore.launchAtLogin)
+            }
+
             Section("Display") {
                 Toggle("Include minimized windows", isOn: $preferencesStore.preferences.includeMinimizedWindows)
                 Toggle("Include utility windows", isOn: $preferencesStore.preferences.includeUtilityWindows)

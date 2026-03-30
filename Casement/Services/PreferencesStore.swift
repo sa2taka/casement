@@ -2,6 +2,7 @@ import AppKit
 import Carbon
 import Combine
 import Foundation
+import ServiceManagement
 
 struct HotkeyShortcut: Codable, Sendable, Equatable {
     var keyCode: UInt32
@@ -109,6 +110,14 @@ struct AppPreferences: Codable, Sendable, Equatable {
 @MainActor
 final class PreferencesStore: ObservableObject {
     @Published var preferences: AppPreferences
+
+    var launchAtLogin: Bool {
+        get { SMAppService.mainApp.status == .enabled }
+        set {
+            objectWillChange.send()
+            try? newValue ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
+        }
+    }
 
     private let key = "com.casement.preferences"
 
