@@ -27,7 +27,9 @@ final class SearchPanelWindow: NSPanel {
     }
 
     func centerOnScreen() {
-        guard let screen = NSScreen.main else { return }
+        let mouseLocation = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { $0.frame.contains(mouseLocation) } ?? NSScreen.main
+        guard let screen else { return }
         let screenFrame = screen.visibleFrame
         let x = screenFrame.midX - frame.width / 2
         let y = screenFrame.midY - frame.height / 2 + screenFrame.height * 0.1
