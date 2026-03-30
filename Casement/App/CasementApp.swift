@@ -6,10 +6,7 @@ struct CasementApp: App {
 
     var body: some Scene {
         Settings {
-            PreferencesView(
-                preferencesStore: appDelegate.preferencesStore,
-                usageStore: appDelegate.usageStore
-            )
+            EmptyView()
         }
     }
 }
