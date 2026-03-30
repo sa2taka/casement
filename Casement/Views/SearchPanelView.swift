@@ -16,7 +16,28 @@ struct SearchPanelView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             Divider()
-            if viewModel.results.isEmpty && !viewModel.query.isEmpty {
+            if viewModel.permissionDenied {
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "lock.shield")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.secondary)
+                    Text("Accessibility permission required")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("Go to System Settings > Privacy & Security > Accessibility and enable Casement.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                    Button("Open System Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Spacer()
+                }
+            } else if viewModel.results.isEmpty && !viewModel.query.isEmpty {
                 VStack {
                     Spacer()
                     Text("No matching windows")

@@ -50,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupHotkey() {
         hotkeyManager.register(shortcut: preferencesStore.preferences.hotkeyShortcut) { [weak self] in
             guard let self else { return }
-            guard self.permissionManager.state == .granted else { return }
+            self.searchPanelViewModel.permissionDenied = self.permissionManager.state != .granted
             self.searchPanelViewModel.togglePanel()
         }
         preferencesStore.$preferences
@@ -200,7 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func toggleSearch() {
-        guard permissionManager.state == .granted else { return }
+        searchPanelViewModel.permissionDenied = permissionManager.state != .granted
         searchPanelViewModel.togglePanel()
     }
 }

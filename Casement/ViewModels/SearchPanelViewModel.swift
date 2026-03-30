@@ -24,6 +24,7 @@ final class SearchPanelViewModel: ObservableObject {
     @Published var showingActions: Bool = false
     @Published var actionIndex: Int = 0
     @Published var errorMessage: String?
+    @Published var permissionDenied: Bool = false
 
     private let windowTracker: WindowTracker
     private let searchIndex = SearchIndex()
