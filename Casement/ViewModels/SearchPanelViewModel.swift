@@ -33,6 +33,7 @@ final class SearchPanelViewModel: ObservableObject {
     private let usageStore: UsageStore
     private let preferencesStore: PreferencesStore
     private let tabProviders: [any TabProvider]
+    private let permissionDeniedProvider: @MainActor () -> Bool
     private var cachedTabs: [TabRecord] = []
     private var cancellables = Set<AnyCancellable>()
 
@@ -40,12 +41,14 @@ final class SearchPanelViewModel: ObservableObject {
         windowTracker: WindowTracker,
         usageStore: UsageStore,
         preferencesStore: PreferencesStore,
-        tabProviders: [any TabProvider] = [ChromeTabProvider(), CmuxTabProvider()]
+        tabProviders: [any TabProvider] = [ChromeTabProvider(), CmuxTabProvider()],
+        permissionDeniedProvider: @escaping @MainActor () -> Bool = { false }
     ) {
         self.windowTracker = windowTracker
         self.usageStore = usageStore
         self.preferencesStore = preferencesStore
         self.tabProviders = tabProviders
+        self.permissionDeniedProvider = permissionDeniedProvider
 
         $query
             .debounce(for: .milliseconds(16), scheduler: RunLoop.main)
@@ -64,6 +67,11 @@ final class SearchPanelViewModel: ObservableObject {
         actionIndex = 0
         errorMessage = nil
         isVisible = true
+        permissionDenied = permissionDeniedProvider()
+        if permissionDenied {
+            results = []
+            return
+        }
         windowTracker.refreshSnapshot()
         rebuildIndex()
         updateResults()
@@ -72,6 +80,7 @@ final class SearchPanelViewModel: ObservableObject {
 
     func closePanel() {
         isVisible = false
+        permissionDenied = false
     }
 
     func togglePanel() {
