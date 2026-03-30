@@ -33,10 +33,7 @@ final class SearchPanelViewModel: ObservableObject {
     private let preferencesStore: PreferencesStore
     private let tabProviders: [any TabProvider]
     private var cachedTabs: [TabRecord] = []
-    private var tabLoadState: TabLoadState = .idle
     private var cancellables = Set<AnyCancellable>()
-
-    private enum TabLoadState { case idle, loading, loaded }
 
     init(
         windowTracker: WindowTracker,
@@ -53,18 +50,6 @@ final class SearchPanelViewModel: ObservableObject {
             .debounce(for: .milliseconds(16), scheduler: RunLoop.main)
             .sink { [weak self] _ in self?.updateResults() }
             .store(in: &cancellables)
-
-        // Lazy tab loading: fetch tabs after user starts typing (300ms debounce)
-        $query
-            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
-            .removeDuplicates()
-            .filter { !$0.isEmpty }
-            .sink { [weak self] _ in
-                guard let self, self.tabLoadState == .idle else { return }
-                self.tabLoadState = .loading
-                Task { await self.refreshTabs() }
-            }
-            .store(in: &cancellables)
     }
 
     var actions: [WindowAction] {
@@ -78,10 +63,10 @@ final class SearchPanelViewModel: ObservableObject {
         actionIndex = 0
         errorMessage = nil
         isVisible = true
-        tabLoadState = .idle
         windowTracker.refreshSnapshot()
         rebuildIndex()
         updateResults()
+        Task { await refreshTabs() }
     }
 
     func closePanel() {
@@ -205,7 +190,6 @@ final class SearchPanelViewModel: ObservableObject {
             allTabs.append(contentsOf: tabs)
         }
         cachedTabs = allTabs
-        tabLoadState = .loaded
         updateResults()
     }
 
