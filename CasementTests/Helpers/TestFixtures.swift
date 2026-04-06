@@ -16,7 +16,8 @@ enum TestFixtures {
             pid: pid,
             axIdentifier: nil,
             titleFingerprint: WindowStableID.titleFingerprint(from: title),
-            boundsFingerprint: "0,0,800,600"
+            boundsFingerprint: "0,0,800,600",
+            cgWindowId: nil
         )
         return WindowRecord(
             stableId: stableId,

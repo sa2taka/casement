@@ -234,10 +234,12 @@ final class SearchPanelViewModel: ObservableObject {
             let normalizedTitle = TextNormalizer.normalize(tab.title)
             let normalizedSubtitle = TextNormalizer.normalize(tab.subtitle)
             let normalizedApp = TextNormalizer.normalize(tab.appName)
-            return normalizedTitle.contains(normalizedQuery)
-                || normalizedSubtitle.contains(normalizedQuery)
-                || normalizedApp.contains(normalizedQuery)
-                || TextNormalizer.isSubsequence(normalizedQuery, of: normalizedTitle)
+            return matchesTabQuery(
+                normalizedQuery,
+                title: normalizedTitle,
+                subtitle: normalizedSubtitle,
+                app: normalizedApp
+            )
         }
         items.append(contentsOf: matchingTabs.map { .tab($0) })
 
@@ -249,6 +251,23 @@ final class SearchPanelViewModel: ObservableObject {
         Task {
             try? await Task.sleep(for: .seconds(2))
             errorMessage = nil
+        }
+    }
+
+    private func matchesTabQuery(
+        _ query: String, title: String, subtitle: String, app: String
+    ) -> Bool {
+        let fields = [title, subtitle, app]
+        if fields.contains(where: { $0.contains(query) }) { return true }
+        if TextNormalizer.isSubsequence(query, of: title) { return true }
+
+        let tokens = query.components(separatedBy: " ").filter { !$0.isEmpty }
+        guard tokens.count > 1 else { return false }
+
+        let combined = "\(app) \(title) \(subtitle)"
+        return tokens.allSatisfy { token in
+            combined.contains(token)
+                || TextNormalizer.isSubsequence(token, of: combined)
         }
     }
 

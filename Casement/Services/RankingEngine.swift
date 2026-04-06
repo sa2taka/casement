@@ -53,6 +53,27 @@ final class RankingEngine {
     }
 
     private func textualScore(window: WindowRecord, query: String) -> (Double, [MatchReason]) {
+        // Try full query as a single string first
+        let singleResult = singleTokenScore(window: window, query: query)
+        if !singleResult.1.isEmpty { return singleResult }
+
+        // Multi-token: score each token, then average
+        let tokens = query.components(separatedBy: " ").filter { !$0.isEmpty }
+        guard tokens.count > 1 else { return singleResult }
+
+        var totalScore: Double = 0
+        var allReasons: [MatchReason] = []
+
+        for token in tokens {
+            let (tokenScore, tokenReasons) = singleTokenScore(window: window, query: token)
+            totalScore += tokenScore
+            allReasons.append(contentsOf: tokenReasons)
+        }
+
+        return (totalScore / Double(tokens.count), allReasons)
+    }
+
+    private func singleTokenScore(window: WindowRecord, query: String) -> (Double, [MatchReason]) {
         var score: Double = 0
         var reasons: [MatchReason] = []
 

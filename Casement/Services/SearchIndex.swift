@@ -47,6 +47,18 @@ final class SearchIndex {
     }
 
     private func matches(_ entry: IndexedWindow, query: String) -> Bool {
+        if matchesSingleToken(entry, query: query) { return true }
+
+        // Multi-token: split query into words, require ALL to match somewhere
+        let tokens = query.components(separatedBy: " ").filter { !$0.isEmpty }
+        guard tokens.count > 1 else { return false }
+
+        return tokens.allSatisfy { token in
+            matchesSingleToken(entry, query: token)
+        }
+    }
+
+    private func matchesSingleToken(_ entry: IndexedWindow, query: String) -> Bool {
         if entry.normalizedAppName.hasPrefix(query) { return true }
         if entry.normalizedAppName.contains(query) { return true }
         if entry.normalizedTitle.hasPrefix(query) { return true }
