@@ -65,6 +65,8 @@ struct SearchResultRowView: View {
             BadgeView(text: "tab", color: .blue)
         case .terminalTab:
             BadgeView(text: "workspace", color: .purple)
+        case .notionTab:
+            BadgeView(text: "tab", color: .green)
         case .window:
             EmptyView()
         }

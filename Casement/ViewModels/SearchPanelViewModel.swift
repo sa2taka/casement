@@ -41,7 +41,7 @@ final class SearchPanelViewModel: ObservableObject {
         windowTracker: WindowTracker,
         usageStore: UsageStore,
         preferencesStore: PreferencesStore,
-        tabProviders: [any TabProvider] = [ChromeTabProvider(), CmuxTabProvider()],
+        tabProviders: [any TabProvider] = [ChromeTabProvider(), CmuxTabProvider(), NotionTabProvider()],
         permissionDeniedProvider: @escaping @MainActor () -> Bool = { false }
     ) {
         self.windowTracker = windowTracker

@@ -4,6 +4,7 @@ enum SearchTargetKind: String, Sendable {
     case window
     case chromeTab
     case terminalTab
+    case notionTab
 }
 
 protocol SearchTarget: Sendable {
