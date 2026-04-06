@@ -114,7 +114,8 @@ final class WindowTracker: ObservableObject {
             pid: pid,
             axIdentifier: nil,
             titleFingerprint: WindowStableID.titleFingerprint(from: title),
-            boundsFingerprint: WindowStableID.boundsFingerprint(from: bounds)
+            boundsFingerprint: WindowStableID.boundsFingerprint(from: bounds),
+            cgWindowId: windowNumber
         )
 
         return WindowRecord(
@@ -173,11 +174,15 @@ final class WindowTracker: ObservableObject {
                 var focusedRef: CFTypeRef?
                 if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedRef) == .success {
                     // swiftlint:disable:next force_cast
-                    windowArray = [focusedRef as! AXUIElement]
+                    let element = focusedRef as! AXUIElement
+                    // Some Electron apps return the AXApplication element itself
+                    // instead of an AXWindow. Filter out non-window elements.
+                    let role = axAttribute(element, kAXRoleAttribute) as? String
+                    if role == nil || role == "AXWindow" {
+                        windowArray = [element]
+                    }
                 }
             }
-
-            guard !windowArray.isEmpty else { continue }
 
             var matchedKeys: Set<WindowStableID> = []
 
@@ -218,27 +223,37 @@ final class WindowTracker: ObservableObject {
 
             // If at least one window was confirmed as AXWindow, infer the same
             // for unmatched CG windows of the same app.
-            let hasConfirmedWindow = matchedKeys.contains { key in
-                records[key]?.role == "AXWindow"
-            }
+            let allKeysForPid = records.keys.filter { $0.pid == pid }
+            let hasConfirmedWindow = matchedKeys.contains { records[$0]?.role == "AXWindow" }
+
             if hasConfirmedWindow {
-                let allKeysForPid = records.keys.filter { $0.pid == pid }
-                let untitledKeys = allKeysForPid.filter { key in
-                    !matchedKeys.contains(key) && records[key]?.role == nil
-                }
-                for key in untitledKeys {
+                for key in allKeysForPid where !matchedKeys.contains(key) && records[key]?.role == nil {
                     guard var record = records[key] else { continue }
                     record.role = "AXWindow"
                     record.subrole = "AXStandardWindow"
                     records[key] = record
                 }
+            }
 
-                // Fill missing titles from the app's Window menu.
-                // Electron apps (Cursor, VSCode) list all windows there even when inactive.
-                if !untitledKeys.isEmpty {
-                    let knownTitles = Set(matchedKeys.compactMap { records[$0]?.title }.filter { !$0.isEmpty })
-                    let menuTitles = windowMenuTitles(for: appElement).filter { !knownTitles.contains($0) }
-                    for (key, title) in zip(untitledKeys, menuTitles) {
+            // Use the Window menu to fill roles and titles for any remaining
+            // unenriched CG windows. The Window menu is the most reliable
+            // source for Electron apps (Cursor, VSCode) where kAXWindows
+            // often returns empty or partial results.
+            let unenrichedKeys = allKeysForPid.filter { records[$0]?.role == nil }
+            let untitledKeys = allKeysForPid.filter { records[$0]?.title.isEmpty == true }
+
+            if !unenrichedKeys.isEmpty || !untitledKeys.isEmpty {
+                let menuTitles = windowMenuTitles(for: appElement)
+                if !menuTitles.isEmpty {
+                    for key in unenrichedKeys {
+                        guard var record = records[key] else { continue }
+                        record.role = "AXWindow"
+                        record.subrole = "AXStandardWindow"
+                        records[key] = record
+                    }
+                    let knownTitles = Set(allKeysForPid.compactMap { records[$0]?.title }.filter { !$0.isEmpty })
+                    let availableTitles = menuTitles.filter { !knownTitles.contains($0) }
+                    for (key, title) in zip(untitledKeys, availableTitles) {
                         guard var record = records[key] else { continue }
                         record.title = title
                         record.normalizedTitle = TextNormalizer.normalize(title)
@@ -275,7 +290,12 @@ final class WindowTracker: ObservableObject {
                 // Fall back to kAXFocusedWindow.
                 var focusedRef: CFTypeRef?
                 if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedRef) == .success {
-                    windowArray = [focusedRef as! AXUIElement]
+                    // swiftlint:disable:next force_cast
+                    let element = focusedRef as! AXUIElement
+                    let role = axAttribute(element, kAXRoleAttribute) as? String
+                    if role == nil || role == "AXWindow" {
+                        windowArray = [element]
+                    }
                 }
             }
             guard !windowArray.isEmpty else { continue }
@@ -293,7 +313,8 @@ final class WindowTracker: ObservableObject {
                     pid: pid,
                     axIdentifier: nil,
                     titleFingerprint: WindowStableID.titleFingerprint(from: title),
-                    boundsFingerprint: WindowStableID.boundsFingerprint(from: bounds)
+                    boundsFingerprint: WindowStableID.boundsFingerprint(from: bounds),
+                    cgWindowId: nil
                 )
 
                 let record = WindowRecord(

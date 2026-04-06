@@ -5,9 +5,13 @@ struct WindowStableID: Hashable, Sendable {
     let axIdentifier: String?
     let titleFingerprint: String
     let boundsFingerprint: String
+    /// Disambiguator for CG windows that share pid, title, and bounds
+    /// (e.g. Electron apps whose CG entries are all identical).
+    let cgWindowId: CGWindowID?
 
     var stringRepresentation: String {
-        "\(pid)|\(axIdentifier ?? "")|\(titleFingerprint)|\(boundsFingerprint)"
+        let cg = cgWindowId.map { String($0) } ?? ""
+        return "\(pid)|\(axIdentifier ?? "")|\(titleFingerprint)|\(boundsFingerprint)|\(cg)"
     }
 
     static func titleFingerprint(from title: String) -> String {

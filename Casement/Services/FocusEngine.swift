@@ -5,7 +5,6 @@ enum FocusError: Error {
     case windowNotFound
     case appNotRunning
     case accessibilityDenied
-    case axElementUnavailable
     case unminimizeFailed
     case focusFailed
 }
@@ -26,37 +25,54 @@ final class FocusEngine {
             }
         }
 
-        let axWindow = try findAXWindow(for: record)
+        // When the title was filled from the Window menu (stableId has no
+        // title fingerprint), use the Window menu to focus directly — it is
+        // more reliable than kAXWindows for Electron apps (Cursor, VSCode).
+        let titleFromMenu = record.stableId.titleFingerprint.isEmpty && !record.title.isEmpty
+        let appElement = AXUIElementCreateApplication(record.pid)
 
-        if record.isMinimized {
-            let result = AXUIElementSetAttributeValue(
-                axWindow,
-                kAXMinimizedAttribute as CFString,
-                kCFBooleanFalse
-            )
-            if result != .success {
-                throw FocusError.unminimizeFailed
-            }
-            try await Task.sleep(for: .milliseconds(100))
+        if titleFromMenu, pressWindowMenuItem(for: appElement, title: record.title) {
+            try await Task.sleep(for: .milliseconds(200))
+            return
         }
 
-        AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
-        AXUIElementSetAttributeValue(axWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
+        if let axWindow = findAXWindow(for: record) {
+            if record.isMinimized {
+                let result = AXUIElementSetAttributeValue(
+                    axWindow,
+                    kAXMinimizedAttribute as CFString,
+                    kCFBooleanFalse
+                )
+                if result != .success {
+                    throw FocusError.unminimizeFailed
+                }
+                try await Task.sleep(for: .milliseconds(100))
+            }
 
-        try await Task.sleep(for: .milliseconds(100))
-        let focused = checkFocused(axWindow)
-        if !focused {
-            app.activate()
             AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+            AXUIElementSetAttributeValue(axWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
+
             try await Task.sleep(for: .milliseconds(100))
+            let focused = checkFocused(axWindow)
+            if !focused {
+                app.activate()
+                AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+                try await Task.sleep(for: .milliseconds(100))
+            }
+        } else if !titleFromMenu {
+            // Last resort: try Window menu even if we didn't detect it as menu-titled
+            guard pressWindowMenuItem(for: appElement, title: record.title) else {
+                throw FocusError.windowNotFound
+            }
+            try await Task.sleep(for: .milliseconds(200))
+        } else {
+            throw FocusError.windowNotFound
         }
     }
 
-    private func findAXWindow(for record: WindowRecord) throws -> AXUIElement {
+    private func findAXWindow(for record: WindowRecord) -> AXUIElement? {
         let appElement = AXUIElementCreateApplication(record.pid)
 
-        // Some apps (e.g. Chrome, Cmux) return empty kAXWindows when not active.
-        // Fall back to kAXFocusedWindow.
         var windows: [AXUIElement] = []
         var windowsRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef) == .success,
@@ -65,9 +81,15 @@ final class FocusEngine {
         } else {
             var focusedRef: CFTypeRef?
             if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedRef) == .success {
-                return focusedRef as! AXUIElement
+                let element = focusedRef as! AXUIElement
+                var roleRef: CFTypeRef?
+                AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef)
+                let role = roleRef as? String
+                if role == nil || role == "AXWindow" {
+                    windows = [element]
+                }
             }
-            throw FocusError.axElementUnavailable
+            if windows.isEmpty { return nil }
         }
 
         let targetFingerprint = record.stableId.titleFingerprint
@@ -102,7 +124,45 @@ final class FocusEngine {
             return window
         }
 
-        throw FocusError.windowNotFound
+        return nil
+    }
+
+    /// Activate a window by pressing its entry in the app's Window menu.
+    private func pressWindowMenuItem(for appElement: AXUIElement, title: String) -> Bool {
+        guard !title.isEmpty else { return false }
+
+        var menuBarRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(appElement, kAXMenuBarAttribute as CFString, &menuBarRef) == .success,
+              let menuBar = menuBarRef
+        else { return false }
+
+        var childrenRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(menuBar as! AXUIElement, kAXChildrenAttribute as CFString, &childrenRef)
+        guard let menus = childrenRef as? [AXUIElement] else { return false }
+
+        for menu in menus {
+            var menuTitleRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(menu, kAXTitleAttribute as CFString, &menuTitleRef)
+            let menuTitle = menuTitleRef as? String ?? ""
+            guard menuTitle == "Window" || menuTitle == "ウィンドウ" || menuTitle == "ウインドウ" else { continue }
+
+            var subMenusRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(menu, kAXChildrenAttribute as CFString, &subMenusRef)
+            guard let subMenus = subMenusRef as? [AXUIElement], let firstSub = subMenus.first else { return false }
+
+            var itemsRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(firstSub, kAXChildrenAttribute as CFString, &itemsRef)
+            guard let items = itemsRef as? [AXUIElement] else { return false }
+
+            for item in items {
+                var itemTitleRef: CFTypeRef?
+                AXUIElementCopyAttributeValue(item, kAXTitleAttribute as CFString, &itemTitleRef)
+                if (itemTitleRef as? String) == title {
+                    return AXUIElementPerformAction(item, kAXPressAction as CFString) == .success
+                }
+            }
+        }
+        return false
     }
 
     private func checkFocused(_ window: AXUIElement) -> Bool {
